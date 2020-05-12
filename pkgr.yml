@@ -1,0 +1,33 @@
+Version: 1
+
+Packages:
+  - tidyverse
+  - metrumrg
+  - yspec
+  - bitops
+  - caTools
+  - mrgsolve
+  - rstan
+  - bayesplot
+  - cowplot
+  - loo
+  - Runuran
+  - future.apply
+  - mrggsave
+  - GGally
+  - kableExtra
+
+Repos:
+  - MPN: https://mpn.metworx.com/snapshots/stable/2020-04-18/
+  - CRAN: "https://cran.rstudio.com/"
+
+Customizations:
+  Packages:
+  - metrumrg:
+      Suggests: true
+  - Runuran:
+      Repo: CRAN
+      
+Lockfile:
+    Type: renv
+
