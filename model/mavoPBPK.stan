@@ -1,15 +1,8 @@
-// Mavoglurant population PBPK model
-// Source: https://nlmixrdevelopment.github.io/nlmixr.examples/articles/mavoglurant.html
-
 functions{
-  real[] PBPKModelODE(real t,
-			real[] x,
-			real[] parms,
-			real WT,
-			real[] rdummy,
-			int[] idummy){
-    
+  real[] PBPKModelODE(real t, real[] x, real[] parms, real[] rdummy, int[] idummy){
     real dxdt[16];
+    real WT = rdummy[1];
+    //print(WT);
     
     //// fixed parameters ////
     // Regional blood flows
@@ -51,7 +44,7 @@ functions{
     // partition coefficients
     real KbLU = exp(0.8334);
     real KbHT = exp(1.1205);
-    real KbSK = exp(-.5238);
+    real KbSK = exp(-0.5238);
     real KbSP = exp(0.3224);
     real KbPA = exp(0.3224);
     real KbLI = exp(1.7604);
@@ -104,10 +97,7 @@ functions{
     dxdt[12] = QBO*(Arterial_Blood/VAB - Bones/KbBO/VBO);  //bones
     dxdt[13] = QKI*(Arterial_Blood/VAB - Kidneys/KbKI/VKI);  //kidneys
     dxdt[14] = QLU*(Lungs/KbLU/VLU - Arterial_Blood/VAB);  //lungs
-    dxdt[15] = QHT*Heart/KbHT/VHT + QBR*Brain/KbBR/VBR +  
-            QMU*Muscles/KbMU/VMU + QAD*Adipose/KbAD/VAD +
-            QSK*Skin/KbSK/VSK + QLI*Liver/KbLI/VLI + QBO*Bones/KbBO/VBO +
-            QKI*Kidneys/KbKI/VKI + QRB*Rest_of_Body/KbRB/VRB - QLU*Venous_Blood/VVB;  //venous_blood
+    dxdt[15] = QHT*Heart/KbHT/VHT + QBR*Brain/KbBR/VBR + QMU*Muscles/KbMU/VMU + QAD*Adipose/KbAD/VAD + QSK*Skin/KbSK/VSK + QLI*Liver/KbLI/VLI + QBO*Bones/KbBO/VBO + QKI*Kidneys/KbKI/VKI + QRB*Rest_of_Body/KbRB/VRB - QLU*Venous_Blood/VVB;  //venous_blood
     dxdt[16] = QRB*(Arterial_Blood/VAB - Rest_of_Body/KbRB/VRB);  //arterial blood
 
     return dxdt;
@@ -129,19 +119,10 @@ data{
   vector<lower = 0>[nObs] cObs;
   
   // data for population model
-  int<lower = 1> nSubjects;
-  int<lower = 1> start[nSubjects];
-  int<lower = 1> end[nSubjects];
-  real<lower = 0> weight[nSubjects];
-  
-  // data for priors
-  real<lower = 0> CLintHatPrior;
-  real<lower = 0> CLintHatPriorCV;
-  real<lower = 0> KbBRPrior;
-  real<lower = 0> KbMUPrior;
-  real<lower = 0> KbADPrior;
-  real<lower = 0> KbBOPrior;
-  real<lower = 0> KbRBPrior;
+  int<lower = 1> nSubject;
+  int<lower = 1> start[nSubject];
+  int<lower = 1> end[nSubject];
+  real<lower = 0> weight[nSubject];
 }
 
 transformed data{
@@ -149,12 +130,22 @@ transformed data{
   int nTheta = 6;  // number of parameters
   int nIIV = 1;  // parameters with IIV
   int nCmt = 16;  // number of compartments
-  real biovar[nCmt];
-  real tlag[nCmt];
+  real biovar[nSubject, nCmt];
+  real tlag[nSubject, nCmt];
+  real VVB[nSubject];
+  int len[nSubject];
+  real<lower = 0> WT[nSubject, 1]; 
+  int<lower = 0> idummy[nSubject, 1];
   
-  for (i in 1:nCmt) {
-    biovar[i] = 1;
-    tlag[i] = 0;
+  for (i in 1:nSubject) {
+    for (j in 1:nCmt) {
+      biovar[i, j] = 1;
+      tlag[i, j] = 0;
+    }
+    WT[i,1] = weight[i]; 
+    idummy[i, 1] = 0;
+    len[i] = end[i] - start[i] + 1;
+    VVB[i] = (5.62 * weight[i]/100) / 1.040;
   }
 }
 
@@ -172,321 +163,106 @@ parameters{
   // IIV parameters
   cholesky_factor_corr[nIIV] L;
   vector<lower = 0>[nIIV] omega;
-  matrix[nIIV, nSubjects] etaStd;
-  
+  matrix[nIIV, nSubject] etaStd;
 }
 
 transformed parameters{
   row_vector[nt] cHat;
   row_vector[nObs] cHatObs;
   matrix[nCmt, nt] x;
-  real<lower = 0> parms[nTheta]; 
+  real<lower = 0> parms[nSubject, nTheta]; // The [1] indicates the parameters are constant
   
   // variables for Matt's trick
   vector<lower = 0>[nIIV] thetaHat;
-  matrix<lower = 0>[nSubjects, nIIV] thetaM; 
+  matrix<lower = 0>[nSubject, nIIV] thetaM; 
 
   // Matt's trick to use unit scale
   thetaHat[1] = CLintHat; 
-  thetaM = (rep_matrix(thetaHat, nSubjects) .* 
-             exp(diag_pre_multiply(omega, L * etaStd)))';
+  thetaM = (rep_matrix(thetaHat, nSubject) .* exp(diag_pre_multiply(omega, L * etaStd)))';
 
-  for(i in 1:nSubjects) {
-
-  real<lower = 0> ;
-  real<lower = 0> ;
-  real<lower = 0> ;
-  real<lower = 0> ;
-  real<lower = 0> ;
-  
-    parms[1] = thetaM[i, 1]; // CLint
-    parms[2] = KbBR; 
-    parms[3] = KbMU; 
-    parms[4] = KbAD; 
-    parms[5] = KbBO; 
-    parms[6] = KbRB;
-
-
-
-
-
-
-    x[start[i]:end[i]] = pmx_solve_rk45(PBPKModelODE, nCmt,
-                                        time[start[i]:end[i]], 
-                                        amt[start[i]:end[i]], 
-                                        rate[start[i]:end[i]], 
-                                        ii[start[i]:end[i]], 
-                                        evid[start[i]:end[i]], 
-                                        cmt[start[i]:end[i]], 
-                                        addl[start[i]:end[i]], 
-                                        ss[start[i]:end[i]],
-                                        parms, biovar, tlag,
-                                        1e-6, 1e-6, 1e6);
-                             
-    cHat[start[i]:end[i]] = x[2, start[i]:end[i]] / parms[3];  // divide by V1
-    neutHat[start[i]:end[i]] = x[8, start[i]:end[i]] + parms[7];  // Add baseline
-    
+  for(i in 1:nSubject) {
+    parms[i, 1] = thetaM[i, 1]; // CLint
+    parms[i, 2] = KbBR; 
+    parms[i, 3] = KbMU; 
+    parms[i, 4] = KbAD; 
+    parms[i, 5] = KbBO; 
+    parms[i, 6] = KbRB;
   }
-  
-  cHatObs = cHat[iObsPK];
-  neutHatObs = neutHat[iObsPD];
 
-}
-
-////////////////////////
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-data{
-  int<lower = 1> nt;
-  int<lower = 1> nObsPK;
-  int<lower = 1> nObsPD;
-  int<lower = 1> iObsPK[nObsPK];
-  int<lower = 1> iObsPD[nObsPD];
-  real<lower = 0> amt[nt];
-  int cmt[nt];
-  int<lower = 0> evid[nt];
-  real<lower = 0> time[nt];
-  real<lower = 0> ii[nt];
-  int<lower = 0> addl[nt];
-  int<lower = 0> ss[nt];
-  real rate[nt];
-  vector<lower = 0>[nObsPK] cObs;
-  vector<lower = 0>[nObsPD] neutObs;
-  
-  // data for population model
-  int<lower = 1> nSubjects;
-  int<lower = 1> start[nSubjects];
-  int<lower = 1> end[nSubjects];
-  real<lower = 0> weight[nSubjects];
-  
-  // data for priors
-  real<lower = 0> CLHatPrior;
-  real<lower = 0> QHatPrior;
-  real<lower = 0> V1HatPrior;
-  real<lower = 0> V2HatPrior;
-  real<lower = 0> kaHatPrior;
-  real<lower = 0> CLHatPriorCV;
-  real<lower = 0> QHatPriorCV;
-  real<lower = 0> V1HatPriorCV;
-  real<lower = 0> V2HatPriorCV;
-  real<lower = 0> kaHatPriorCV;
-  real<lower = 0> circ0HatPrior;
-  real<lower = 0> circ0HatPriorCV;
-  real<lower = 0> mttHatPrior;
-  real<lower = 0> mttHatPriorCV;
-  real<lower = 0> gammaPrior;
-  real<lower = 0> gammaPriorCV;
-  real<lower = 0> alphaHatPrior;
-  real<lower = 0> alphaHatPriorCV;
-}
-
-transformed data{
-  vector[nObsPK] logCObs = log(cObs);
-  vector[nObsPD] logNeutObs = log(neutObs);
-  int nTheta = 9;  // number of ODE parameters
-  int nIIV = 7;  // parameters with IIV
-  int nCmt = 8;  // number of compartments
-  real biovar[nCmt];
-  real tlag[nCmt];
-  
-  for (i in 1:nCmt) {
-    biovar[i] = 1;
-    tlag[i] = 0;
+  x = pmx_solve_group_rk45(PBPKModelODE, nCmt, len,
+                           time, amt, rate, ii, evid, cmt, addl, ss,
+                           parms, biovar, tlag, WT, idummy,
+                           1e-6, 1e-6, 1e6);
+                
+  for(i in 1:nSubject) {             
+    cHat[start[i]:end[i]] = x[15, start[i]:end[i]] / VVB[i];  // divide by subject's blood volume VVB
   }
-}
-
-parameters{
-  real<lower = 0> CLHat;
-  real<lower = 0> QHat;
-  real<lower = 0> V1Hat;
-  real<lower = 0> V2Hat;
-  real<lower = 0> kaHat;
-  real<lower = 0> mttHat;
-  real<lower = 0> circ0Hat;
-  real<lower = 0> alphaHat;
-  real<lower = 0> gamma;
-  real<lower = 0> sigma;
-  real<lower = 0> sigmaNeut;
-  
-  // IIV parameters
-  cholesky_factor_corr[nIIV] L;
-  vector<lower = 0>[nIIV] omega;
-  matrix[nIIV, nSubjects] etaStd;
-  
-}
-
-transformed parameters{
-  row_vector[nt] cHat;
-  row_vector[nObsPK] cHatObs;
-  row_vector[nt] neutHat;
-  row_vector[nObsPD] neutHatObs;
-  matrix[nCmt, nt] x;
-  real<lower = 0> parms[nTheta]; // The [1] indicates the parameters are constant
-  
-  // variables for Matt's trick
-  vector<lower = 0>[nIIV] thetaHat;
-  matrix<lower = 0>[nSubjects, nIIV] thetaM; 
-
-  // Matt's trick to use unit scale
-  thetaHat[1] = CLHat; 
-  thetaHat[2] = QHat;
-  thetaHat[3] = V1Hat;
-  thetaHat[4] = V2Hat;
-  thetaHat[5] = mttHat;
-  thetaHat[6] = circ0Hat;
-  thetaHat[7] = alphaHat;
-  thetaM = (rep_matrix(thetaHat, nSubjects) .* 
-             exp(diag_pre_multiply(omega, L * etaStd)))';
-
-  for(i in 1:nSubjects) {
-
-    parms[1] = thetaM[i, 1] * (weight[i] / 70)^0.75; // CL
-    parms[2] = thetaM[i, 2] * (weight[i] / 70)^0.75; // Q
-    parms[3] = thetaM[i, 3] * (weight[i] / 70); // V1
-    parms[4] = thetaM[i, 4] * (weight[i] / 70); // V2
-    parms[5] = kaHat; // ka
-    parms[6] = thetaM[i, 5]; // mtt
-    parms[7] = thetaM[i, 6]; // circ0
-    parms[8] = gamma;
-    parms[9] = thetaM[i, 7]; // alpha
-
-    x[start[i]:end[i]] = pmx_solve_rk45(twoCptNeutModelODE, nCmt,
-                                        time[start[i]:end[i]], 
-                                        amt[start[i]:end[i]], 
-                                        rate[start[i]:end[i]], 
-                                        ii[start[i]:end[i]], 
-                                        evid[start[i]:end[i]], 
-                                        cmt[start[i]:end[i]], 
-                                        addl[start[i]:end[i]], 
-                                        ss[start[i]:end[i]],
-                                        parms, biovar, tlag,
-                                        1e-6, 1e-6, 1e6);
-                             
-    cHat[start[i]:end[i]] = x[2, start[i]:end[i]] / parms[3];  // divide by V1
-    neutHat[start[i]:end[i]] = x[8, start[i]:end[i]] + parms[7];  // Add baseline
-    
-  }
-  
-  cHatObs = cHat[iObsPK];
-  neutHatObs = neutHat[iObsPD];
-
+  cHatObs = cHat[iObs];
 }
 
 model{
   // Priors
-  CLHat ~ lognormal(log(CLHatPrior), CLHatPriorCV);
-  QHat ~ lognormal(log(QHatPrior), QHatPriorCV);
-  V1Hat ~ lognormal(log(V1HatPrior), V1HatPriorCV);
-  V2Hat ~ lognormal(log(V2HatPrior), V2HatPriorCV);
-  kaHat ~ lognormal(log(kaHatPrior), kaHatPriorCV);
-  sigma ~ cauchy(0, 1);
-  
-  mttHat ~ lognormal(log(mttHatPrior), mttHatPriorCV);
-  circ0Hat ~ lognormal(log(circ0HatPrior), circ0HatPriorCV);
-  alphaHat ~ lognormal(log(alphaHatPrior), alphaHatPriorCV);
-  gamma ~ lognormal(log(gammaPrior), gammaPriorCV);
-  sigmaNeut ~ cauchy(0, 1);
+  CLintHat ~ lognormal(7.1, 0.25);
+  KbBR ~ lognormal(1.1, 0.25);
+  KbMU ~ lognormal(0.3, 0.25);
+  KbAD ~ lognormal(2, 0.25);
+  KbBO ~ lognormal(0.03, 0.25);
+  KbRB ~ lognormal(0.3, 0.25);
+
+  sigma ~ cauchy(0, 0.5);
 
   // Parameters for Matt's trick
+  omega ~ cauchy(0, 0.5);
   L ~ lkj_corr_cholesky(1);
   to_vector(etaStd) ~ normal(0, 1);
 
   // observed data likelihood
   logCObs ~ normal(log(cHatObs), sigma);
-  logNeutObs ~ normal(log(neutHatObs), sigmaNeut);
 }
 
 generated quantities{
   matrix[nCmt, nt] xPred;
-  real<lower = 0> parmsPred[nTheta];
+  real<lower = 0> parmsPred[nSubject, nTheta];
   row_vector[nt] cHatPred;
-  row_vector[nt] neutHatPred;
-  vector<lower = 0>[nObsPK] cHatObsCond;
-  row_vector<lower = 0>[nObsPK] cHatObsPred;
-  vector<lower = 0>[nObsPD] neutHatObsCond;
-  row_vector<lower = 0>[nObsPD] neutHatObsPred;
+  vector<lower = 0>[nObs] cHatObsCond;
+  row_vector<lower = 0>[nObs] cHatObsPred;
 
   // Variables for IIV  
-  matrix[nIIV, nSubjects] etaStdPred;
-  matrix<lower = 0>[nSubjects, nIIV] thetaPredM;
+  matrix[nIIV, nSubject] etaStdPred;
+  matrix<lower = 0>[nSubject, nIIV] thetaPredM;
   corr_matrix[nIIV] rho;
   
   rho = L * L';
-  for(i in 1:nSubjects) {
+  for(i in 1:nSubject) {
     for(j in 1:nIIV) {
       etaStdPred[j, i] = normal_rng(0, 1);
     }
   }
-  thetaPredM = (rep_matrix(thetaHat, nSubjects) .* 
-                exp(diag_pre_multiply(omega, L * etaStdPred)))';
+  thetaPredM = (rep_matrix(thetaHat, nSubject) .* exp(diag_pre_multiply(omega, L * etaStdPred)))';
 
-  for(i in 1:nSubjects) {
-    parmsPred[1] = thetaPredM[i, 1] * (weight[i] / 70)^0.75; // CL
-    parmsPred[2] = thetaPredM[i, 2] * (weight[i] / 70)^0.75; // Q
-    parmsPred[3] = thetaPredM[i, 3] * (weight[i] / 70); // V1
-    parmsPred[4] = thetaPredM[i, 4] * (weight[i] / 70); // V2
-    parmsPred[5] = kaHat; // ka
-    parmsPred[6] = thetaPredM[i, 5]; // mtt
-    parmsPred[7] = thetaPredM[i, 6]; // circ0
-    parmsPred[8] = gamma; // gamma
-    parmsPred[9] = thetaPredM[i, 7]; // alpha
+  for(i in 1:nSubject) {
+    parmsPred[i, 1] = thetaPredM[i, 1]; // CL
+    parmsPred[i, 2] = KbBR; 
+    parmsPred[i, 3] = KbMU;
+    parmsPred[i, 4] = KbAD; 
+    parmsPred[i, 5] = KbBO; 
+    parmsPred[i, 6] = KbRB;
+  }
 
-    xPred[start[i]:end[i]] = pmx_solve_rk45(twoCptNeutModelODE, nCmt,
-                                            time[start[i]:end[i]], 
-                                            amt[start[i]:end[i]],
-                                            rate[start[i]:end[i]],
-                                            ii[start[i]:end[i]],
-                                            evid[start[i]:end[i]],
-                                            cmt[start[i]:end[i]],
-                                            addl[start[i]:end[i]],
-                                            ss[start[i]:end[i]],
-                                            parmsPred, biovar, tlag,
-                                            1e-6, 1e-6, 1e6);
+  xPred = pmx_solve_group_rk45(PBPKModelODE, nCmt, len,
+                               time, amt, rate, ii, evid, cmt, addl, ss,
+                               parmsPred, biovar, tlag, WT, idummy,
+                               1e-6, 1e-6, 1e6);
 
-    cHatPred[start[i]:end[i]] = xPred[2, start[i]:end[i]] / parmsPred[3]; // divide by V1
-    neutHatPred[start[i]:end[i]] = xPred[8, start[i]:end[i]] + parmsPred[7]; // Add baseline
+  for(i in 1:nSubject) {
+    cHatPred[start[i]:end[i]] = xPred[15, start[i]:end[i]] / VVB[i];
   }
 
   // predictions for observed data records
-  cHatObsPred = cHatPred[iObsPK];
-  neutHatObsPred = neutHatPred[iObsPD];
+  cHatObsPred = cHatPred[iObs];
 
-  for(i in 1:nObsPK) {
+  for(i in 1:nObs) {
     cHatObsCond[i] = exp(normal_rng(log(fmax(machine_precision(), cHatObs[i])), sigma));
     cHatObsPred[i] = exp(normal_rng(log(fmax(machine_precision(), cHatObsPred[i])), sigma));
   }
-  
-  for(i in 1:nObsPD) {
-    neutHatObsCond[i] = exp(normal_rng(log(fmax(machine_precision(), neutHatObs[i])), sigmaNeut));
-    neutHatObsPred[i] = exp(normal_rng(log(fmax(machine_precision(), neutHatObsPred[i])), sigmaNeut));
-  }
 }
-
-
