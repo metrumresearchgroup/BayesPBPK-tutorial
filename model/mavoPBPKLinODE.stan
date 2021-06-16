@@ -1,109 +1,3 @@
-functions{
-  real[] PBPKModelODE(real t, real[] x, real[] parms, real[] rdummy, int[] idummy){
-    real dxdt[16];
-    real WT = rdummy[1];
-    //print(WT);
-    
-    //// fixed parameters ////
-    // Regional blood flows
-    real CO  = (187.00*WT^0.81)*60/1000;         // Cardiac output (L/h) from White et al (1968)
-    real QHT = 4.0 *CO/100;
-    real QBR = 12.0*CO/100;
-    real QMU = 17.0*CO/100;
-    real QAD = 5.0 *CO/100;
-    real QSK = 5.0 *CO/100;
-    real QSP = 3.0 *CO/100;
-    real QPA = 1.0 *CO/100;
-    real QLI = 25.5*CO/100;
-    real QST = 1.0 *CO/100;
-    real QGU = 14.0*CO/100;
-    real QHA = QLI - (QSP + QPA + QST + QGU); // Hepatic artery blood flow
-    real QBO = 5.0 *CO/100;
-    real QKI = 19.0*CO/100;
-    real QRB = CO - (QHT + QBR + QMU + QAD + QSK + QLI + QBO + QKI);
-    real QLU = QHT + QBR + QMU + QAD + QSK + QLI + QBO + QKI + QRB;
-
-    // Organs' volumes = organs' weights / organs' density
-    real VLU = (0.76 *WT/100)/1.051;
-    real VHT = (0.47 *WT/100)/1.030;
-    real VBR = (2.00 *WT/100)/1.036;
-    real VMU = (40.00*WT/100)/1.041;
-    real VAD = (21.42*WT/100)/0.916;
-    real VSK = (3.71 *WT/100)/1.116;
-    real VSP = (0.26 *WT/100)/1.054;
-    real VPA = (0.14 *WT/100)/1.045;
-    real VLI = (2.57 *WT/100)/1.040;
-    real VST = (0.21 *WT/100)/1.050;
-    real VGU = (1.44 *WT/100)/1.043;
-    real VBO = (14.29*WT/100)/1.990;
-    real VKI = (0.44 *WT/100)/1.050;
-    real VAB = (2.81 *WT/100)/1.040;
-    real VVB = (5.62 *WT/100)/1.040;
-    real VRB = (3.86 *WT/100)/1.040;
-
-    // partition coefficients
-    real KbLU = exp(0.8334);
-    real KbHT = exp(1.1205);
-    real KbSK = exp(-0.5238);
-    real KbSP = exp(0.3224);
-    real KbPA = exp(0.3224);
-    real KbLI = exp(1.7604);
-    real KbST = exp(0.3224);
-    real KbGU = exp(1.2026);
-    real KbKI = exp(1.3171);
-    
-    // Other parameters
-    real BP = 0.61;      // Blood:plasma partition coefficient
-    real fup = 0.028;    // Fraction unbound in plasma
-    real fub = fup/BP;   // Fraction unbound in blood
-    
-    //// parameters to be estimated ////
-    real CLint = parms[1];
-		real KbBR = parms[2];
-		real KbMU = parms[3];
-		real KbAD = parms[4];
-		real KbBO = parms[5];
-		real KbRB = parms[6];
-    
-    // model compartments
-    real Lungs = x[1];
-    real Heart = x[2];
-    real Brain = x[3];
-    real Muscles = x[4];
-    real Adipose = x[5];
-    real Skin = x[6];
-    real Spleen = x[7];
-    real Pancreas = x[8];
-    real Liver = x[9];
-    real Stomach = x[10];
-    real Gut = x[11];
-    real Bones = x[12];
-    real Kidneys = x[13];
-    real Arterial_Blood = x[14];
-    real Venous_Blood = x[15];
-    real Rest_of_Body = x[16];
-
-    dxdt[1] = QLU*(Venous_Blood/VVB - Lungs/KbLU/VLU);  //lungs
-    dxdt[2] = QHT*(Arterial_Blood/VAB - Heart/KbHT/VHT);  //heart
-    dxdt[3] = QBR*(Arterial_Blood/VAB - Brain/KbBR/VBR);  //brain
-    dxdt[4] = QMU*(Arterial_Blood/VAB - Muscles/KbMU/VMU);  //muscles
-    dxdt[5] = QAD*(Arterial_Blood/VAB - Adipose/KbAD/VAD);  //adipose
-    dxdt[6] = QSK*(Arterial_Blood/VAB - Skin/KbSK/VSK);  //skin
-    dxdt[7] = QSP*(Arterial_Blood/VAB - Spleen/KbSP/VSP);  //spleen
-    dxdt[8] = QPA*(Arterial_Blood/VAB - Pancreas/KbPA/VPA);  //pancreas
-    dxdt[9] = QHA*Arterial_Blood/VAB + QSP*Spleen/KbSP/VSP + QPA*Pancreas/KbPA/VPA + QST*Stomach/KbST/VST + QGU*Gut/KbGU/VGU - CLint*fub*Liver/KbLI/VLI - QLI*Liver/KbLI/VLI;  //liver
-    dxdt[10] = QST*(Arterial_Blood/VAB - Stomach/KbST/VST);  //stomach
-    dxdt[11] = QGU*(Arterial_Blood/VAB - Gut/KbGU/VGU);  //gut
-    dxdt[12] = QBO*(Arterial_Blood/VAB - Bones/KbBO/VBO);  //bones
-    dxdt[13] = QKI*(Arterial_Blood/VAB - Kidneys/KbKI/VKI);  //kidneys
-    dxdt[14] = QLU*(Lungs/KbLU/VLU - Arterial_Blood/VAB);  //lungs
-    dxdt[15] = QHT*Heart/KbHT/VHT + QBR*Brain/KbBR/VBR + QMU*Muscles/KbMU/VMU + QAD*Adipose/KbAD/VAD + QSK*Skin/KbSK/VSK + QLI*Liver/KbLI/VLI + QBO*Bones/KbBO/VBO + QKI*Kidneys/KbKI/VKI + QRB*Rest_of_Body/KbRB/VRB - QLU*Venous_Blood/VVB;  //venous_blood
-    dxdt[16] = QRB*(Arterial_Blood/VAB - Rest_of_Body/KbRB/VRB);  //arterial blood
-
-    return dxdt;
-  }
-}
-
 data{
   int<lower = 1> nt;
   int<lower = 1> nObs;
@@ -130,22 +24,104 @@ transformed data{
   int nTheta = 6;  // number of parameters
   int nIIV = 1;  // parameters with IIV
   int nCmt = 16;  // number of compartments
-  real biovar[nSubject, nCmt];
-  real tlag[nSubject, nCmt];
-  real VVB[nSubject];
-  int len[nSubject];
-  real<lower = 0> WT[nSubject, 1]; 
-  int<lower = 0> idummy[nSubject, 1];
+  real biovar[nCmt];
+  real tlag[nCmt];
   
-  for (i in 1:nSubject) {
-    for (j in 1:nCmt) {
-      biovar[i, j] = 1;
-      tlag[i, j] = 0;
-    }
-    WT[i,1] = weight[i]; 
-    idummy[i, 1] = 0;
-    len[i] = end[i] - start[i] + 1;
-    VVB[i] = (5.62 * weight[i]/100) / 1.040;
+  // objects to hold fixed parameters
+    // Regional blood flows
+    real CO[nSubject];         // Cardiac output (L/h) from White et al (1968)
+    real QHT[nSubject];
+    real QBR[nSubject];
+    real QMU[nSubject];
+    real QAD[nSubject];
+    real QSK[nSubject];
+    real QSP[nSubject];
+    real QPA[nSubject];
+    real QLI[nSubject];
+    real QST[nSubject];
+    real QGU[nSubject];
+    real QHA[nSubject]; // Hepatic artery blood flow
+    real QBO[nSubject];
+    real QKI[nSubject];
+    real QRB[nSubject];
+    real QLU[nSubject];
+    
+    // Organs' volumes = organs' weights / organs' density
+    real VLU[nSubject];
+    real VHT[nSubject];
+    real VBR[nSubject];
+    real VMU[nSubject];
+    real VAD[nSubject];
+    real VSK[nSubject];
+    real VSP[nSubject];
+    real VPA[nSubject];
+    real VLI[nSubject];
+    real VST[nSubject];
+    real VGU[nSubject];
+    real VBO[nSubject];
+    real VKI[nSubject];
+    real VAB[nSubject];
+    real VVB[nSubject];
+    real VRB[nSubject];
+    
+    // partition coefficients
+    real KbLU = exp(0.8334);
+    real KbHT = exp(1.1205);
+    real KbSK = exp(-0.5238);
+    real KbSP = exp(0.3224);
+    real KbPA = exp(0.3224);
+    real KbLI = exp(1.7604);
+    real KbST = exp(0.3224);
+    real KbGU = exp(1.2026);
+    real KbKI = exp(1.3171);
+    
+    // Other parameters
+    real BP = 0.61;      // Blood:plasma partition coefficient
+    real fup = 0.028;    // Fraction unbound in plasma
+    real fub = fup/BP;   // Fraction unbound in blood
+  
+  //// fixed parameters ////
+  for(i in 1:nSubject) {
+    // Regional blood flows
+    CO[i]  = (187.00*weight[i]^0.81)*60/1000;         // Cardiac output (L/h) from White et al (1968)
+    QHT[i] = 4.0*CO[i]/100;
+    QBR[i] = 12.0*CO[i]/100;
+    QMU[i] = 17.0*CO[i]/100;
+    QAD[i] = 5.0 *CO[i]/100;
+    QSK[i] = 5.0 *CO[i]/100;
+    QSP[i] = 3.0 *CO[i]/100;
+    QPA[i] = 1.0 *CO[i]/100;
+    QLI[i] = 25.5*CO[i]/100;
+    QST[i] = 1.0 *CO[i]/100;
+    QGU[i] = 14.0*CO[i]/100;
+    QHA[i] = QLI[i] - (QSP[i] + QPA[i] + QST[i] + QGU[i]); // Hepatic artery blood flow
+    QBO[i] = 5.0 *CO[i]/100;
+    QKI[i] = 19.0*CO[i]/100;
+    QRB[i] = CO[i] - (QHT[i] + QBR[i] + QMU[i] + QAD[i] + QSK[i] + QLI[i] + QBO[i] + QKI[i]);
+    QLU[i] = QHT[i] + QBR[i] + QMU[i] + QAD[i] + QSK[i] + QLI[i] + QBO[i] + QKI[i] + QRB[i];
+
+    // Organs' volumes = organs' weights / organs' density
+    VLU[i] = (0.76 *weight[i]/100)/1.051;
+    VHT[i] = (0.47 *weight[i]/100)/1.030;
+    VBR[i] = (2.00 *weight[i]/100)/1.036;
+    VMU[i] = (40.00*weight[i]/100)/1.041;
+    VAD[i] = (21.42*weight[i]/100)/0.916;
+    VSK[i] = (3.71 *weight[i]/100)/1.116;
+    VSP[i] = (0.26 *weight[i]/100)/1.054;
+    VPA[i] = (0.14 *weight[i]/100)/1.045;
+    VLI[i] = (2.57 *weight[i]/100)/1.040;
+    VST[i] = (0.21 *weight[i]/100)/1.050;
+    VGU[i] = (1.44 *weight[i]/100)/1.043;
+    VBO[i] = (14.29*weight[i]/100)/1.990;
+    VKI[i] = (0.44 *weight[i]/100)/1.050;
+    VAB[i] = (2.81 *weight[i]/100)/1.040;
+    VVB[i] = (5.62 *weight[i]/100)/1.040;
+    VRB[i] = (3.86 *weight[i]/100)/1.040;
+  }
+  
+  for (i in 1:nCmt) {
+    biovar[i] = 1;
+    tlag[i] = 0;
   }
 }
 
@@ -170,132 +146,79 @@ transformed parameters{
   row_vector[nt] cHat;
   row_vector[nObs] cHatObs;
   matrix[nCmt, nt] x;
-  real<lower = 0> parms[nSubject, nTheta]; // The [1] indicates the parameters are constant
+  matrix[nCmt, nCmt] K;
   
   // variables for Matt's trick
   vector<lower = 0>[nIIV] thetaHat;
   matrix<lower = 0>[nSubject, nIIV] thetaM; 
+  
+  // individual-level physiological paraeters
+  real CLint[nSubject];
 
   // Matt's trick to use unit scale
   thetaHat[1] = CLintHat; 
   thetaM = (rep_matrix(thetaHat, nSubject) .* exp(diag_pre_multiply(omega, L * etaStd)))';
 
   for(i in 1:nSubject) {
-    //// fixed parameters ////
-    // covariate
-    real WT = weight[i];
-    real VVB = (5.62 * weight[i]/100) / 1.040;
-    
-    // Regional blood flows
-    real CO  = (187.00*WT^0.81)*60/1000;         // Cardiac output (L/h) from White et al (1968)
-    real QHT = 4.0 *CO/100;
-    real QBR = 12.0*CO/100;
-    real QMU = 17.0*CO/100;
-    real QAD = 5.0 *CO/100;
-    real QSK = 5.0 *CO/100;
-    real QSP = 3.0 *CO/100;
-    real QPA = 1.0 *CO/100;
-    real QLI = 25.5*CO/100;
-    real QST = 1.0 *CO/100;
-    real QGU = 14.0*CO/100;
-    real QHA = QLI - (QSP + QPA + QST + QGU); // Hepatic artery blood flow
-    real QBO = 5.0 *CO/100;
-    real QKI = 19.0*CO/100;
-    real QRB = CO - (QHT + QBR + QMU + QAD + QSK + QLI + QBO + QKI);
-    real QLU = QHT + QBR + QMU + QAD + QSK + QLI + QBO + QKI + QRB;
-
-    // Organs' volumes = organs' weights / organs' density
-    real VLU = (0.76 *WT/100)/1.051;
-    real VHT = (0.47 *WT/100)/1.030;
-    real VBR = (2.00 *WT/100)/1.036;
-    real VMU = (40.00*WT/100)/1.041;
-    real VAD = (21.42*WT/100)/0.916;
-    real VSK = (3.71 *WT/100)/1.116;
-    real VSP = (0.26 *WT/100)/1.054;
-    real VPA = (0.14 *WT/100)/1.045;
-    real VLI = (2.57 *WT/100)/1.040;
-    real VST = (0.21 *WT/100)/1.050;
-    real VGU = (1.44 *WT/100)/1.043;
-    real VBO = (14.29*WT/100)/1.990;
-    real VKI = (0.44 *WT/100)/1.050;
-    real VAB = (2.81 *WT/100)/1.040;
-    real VVB = (5.62 *WT/100)/1.040;
-    real VRB = (3.86 *WT/100)/1.040;
-
-    // partition coefficients
-    real KbLU = exp(0.8334);
-    real KbHT = exp(1.1205);
-    real KbSK = exp(-0.5238);
-    real KbSP = exp(0.3224);
-    real KbPA = exp(0.3224);
-    real KbLI = exp(1.7604);
-    real KbST = exp(0.3224);
-    real KbGU = exp(1.2026);
-    real KbKI = exp(1.3171);
-    
-    // Other parameters
-    real BP = 0.61;      // Blood:plasma partition coefficient
-    real fup = 0.028;    // Fraction unbound in plasma
-    real fub = fup/BP;   // Fraction unbound in blood
-    
-    parms[i, 1] = thetaM[i, 1]; // CLint
-    parms[i, 2] = KbBR; 
-    parms[i, 3] = KbMU; 
-    parms[i, 4] = KbAD; 
-    parms[i, 5] = KbBO; 
-    parms[i, 6] = KbRB;
+    CLint[i] = thetaM[i, 1]; // CLint
     
     // Filling coefficient matrix
     K = rep_matrix(0, nCmt, nCmt);
-K[1,1] = - QLU*1/KbLU/VLU;
-K[14,1] =  QLU*1/KbLU/VLU ;
-K[2,2] = - QHT*1/KbHT/VHT;
-K[15,2] =  QHT*1/KbHT/VHT ;
-K[3,3] = - QBR*1/KbBR/VBR;
-K[15,3] = + QBR*1/KbBR/VBR ;
-K[4,4] = - QMU*1/KbMU/VMU;
-K[15,4] = + QMU*1/KbMU/VMU ;
-K[5,5] = - QAD*1/KbAD/VAD;
-K[15,5] = + QAD*1/KbAD/VAD ;
-K[6,6] = - QSK*1/KbSK/VSK;
-K[15,6] = + QSK*1/KbSK/VSK ;
-K[7,7] = - QSP*1/KbSP/VSP;
-K[9,7] = + QSP*1/KbSP/VSP ;
-K[8,8] = - QPA*1/KbPA/VPA;
-K[9,8] = + QPA*1/KbPA/VPA ;
-K[9,9] = - (CLint*fub + QLI)*1/KbLI/VLI;
-K[15,9] = + QLI*1/KbLI/VLI ;
-K[9,10] = + QST*1/KbST/VST ;
-K[10,10] = - QST*1/KbST/VST;
-K[9,11] = + QGU*1/KbGU/VGU ;
-K[11,11] = - QGU*1/KbGU/VGU;
-K[12,12] = - QBO*1/KbBO/VBO;
-K[15,12] = + QBO*1/KbBO/VBO ;
-K[13,13] = - QKI*1/KbKI/VKI;
-K[15,13] = + QKI*1/KbKI/VKI ;
-K[2,14] =  QHT*1/VAB ;
-K[3,14] =  QBR*1/VAB ;
-K[4,14] =  QMU*1/VAB ;
-K[5,14] =  QAD*1/VAB ;
-K[6,14] =  QSK*1/VAB ;
-K[7,14] =  QSP*1/VAB ;
-K[8,14] =  QPA*1/VAB ;
-K[9,14] =  QHA*1/VAB ;
-K[10,14] =  QST*1/VAB ;
-K[11,14] =  QGU*1/VAB ;
-K[12,14] =  QBO*1/VAB ;
-K[13,14] =  QKI*1/VAB ;
-K[14,14] = - QLU*1/VAB;
-K[16,14] =  QRB*1/VAB ;
-K[1,15] =  QLU*1/VVB ;
-K[15,15] = - QLU*1/VVB;
-K[15,16] = + QRB*1/KbRB/VRB ;
-K[16,16] = - QRB*1/KbRB/VRB;
+    
+    K[1,1] = -QLU[i]/KbLU/VLU[i];
+    K[14,1] =  QLU[i]/KbLU/VLU[i];
+    K[2,2] = -QHT[i]/KbHT/VHT[i];
+    K[15,2] =  QHT[i]/KbHT/VHT[i];
+    K[3,3] = -QBR[i]/KbBR/VBR[i];
+    K[15,3] = QBR[i]/KbBR/VBR[i];
+    K[4,4] = -QMU[i]/KbMU/VMU[i];
+    K[15,4] = QMU[i]/KbMU/VMU[i];
+    K[5,5] = -QAD[i]/KbAD/VAD[i];
+    K[15,5] = QAD[i]/KbAD/VAD[i];
+    K[6,6] = -QSK[i]/KbSK/VSK[i];
+    K[15,6] = QSK[i]/KbSK/VSK[i];
+    K[7,7] = -QSP[i]/KbSP/VSP[i];
+    K[9,7] = QSP[i]/KbSP/VSP[i];
+    K[8,8] = -QPA[i]/KbPA/VPA[i];
+    K[9,8] = QPA[i]/KbPA/VPA[i];
+    K[9,9] = -(CLint[i]*fub + QLI[i])/KbLI/VLI[i];
+    K[15,9] = QLI[i]/KbLI/VLI[i];
+    K[9,10] = QST[i]/KbST/VST[i];
+    K[10,10] = -QST[i]/KbST/VST[i];
+    K[9,11] = QGU[i]/KbGU/VGU[i];
+    K[11,11] = -QGU[i]/KbGU/VGU[i];
+    K[12,12] = -QBO[i]/KbBO/VBO[i];
+    K[15,12] = QBO[i]/KbBO/VBO[i];
+    K[13,13] = -QKI[i]/KbKI/VKI[i];
+    K[15,13] = QKI[i]/KbKI/VKI[i];
+    K[2,14] =  QHT[i]/VAB[i];
+    K[3,14] =  QBR[i]/VAB[i];
+    K[4,14] =  QMU[i]/VAB[i];
+    K[5,14] =  QAD[i]/VAB[i];
+    K[6,14] =  QSK[i]/VAB[i];
+    K[7,14] =  QSP[i]/VAB[i];
+    K[8,14] =  QPA[i]/VAB[i];
+    K[9,14] =  QHA[i]/VAB[i];
+    K[10,14] =  QST[i]/VAB[i];
+    K[11,14] =  QGU[i]/VAB[i];
+    K[12,14] =  QBO[i]/VAB[i];
+    K[13,14] =  QKI[i]/VAB[i];
+    K[14,14] = -QLU[i]/VAB[i];
+    K[16,14] =  QRB[i]/VAB[i];
+    K[1,15] =  QLU[i]/VVB[i];
+    K[15,15] = -QLU[i]/VVB[i];
+    K[15,16] = QRB[i]/KbRB/VRB[i];
+    K[16,16] = -QRB[i]/KbRB/VRB[i];
 
-  x = pmx_solve_group_rk45(PBPKModelODE, nCmt, len,
-                           time, amt, rate, ii, evid, cmt, addl, ss,
-                           parms, biovar, tlag, WT, idummy,
-                           1e-6, 1e-6, 1e6);
+    x[,start[i]:end[i]] = pmx_solve_linode(time[start[i]:end[i]],
+                                          amt[start[i]:end[i]],
+                                          rate[start[i]:end[i]],
+                                          ii[start[i]:end[i]],
+                                          evid[start[i]:end[i]],
+                                          cmt[start[i]:end[i]],
+                                          addl[start[i]:end[i]],
+                                          ss[start[i]:end[i]],
+                                          K, biovar, tlag);
            
     cHat[start[i]:end[i]] = x[15, start[i]:end[i]] / VVB[i];  // divide by subject's blood volume VVB
   }
@@ -324,7 +247,7 @@ model{
 
 generated quantities{
   matrix[nCmt, nt] xPred;
-  real<lower = 0> parmsPred[nSubject, nTheta];
+  matrix[nCmt, nCmt] KPred;
   row_vector[nt] cHatPred;
   vector<lower = 0>[nObs] cHatObsCond;
   row_vector<lower = 0>[nObs] cHatObsPred;
@@ -333,6 +256,9 @@ generated quantities{
   matrix[nIIV, nSubject] etaStdPred;
   matrix<lower = 0>[nSubject, nIIV] thetaPredM;
   corr_matrix[nIIV] rho;
+  
+  // Individual-level model parameters
+  real CLintPred[nSubject];
   
   rho = L * L';
   for(i in 1:nSubject) {
@@ -343,28 +269,73 @@ generated quantities{
   thetaPredM = (rep_matrix(thetaHat, nSubject) .* exp(diag_pre_multiply(omega, L * etaStdPred)))';
 
   for(i in 1:nSubject) {
-    parmsPred[i, 1] = thetaPredM[i, 1]; // CL
-    parmsPred[i, 2] = KbBR; 
-    parmsPred[i, 3] = KbMU;
-    parmsPred[i, 4] = KbAD; 
-    parmsPred[i, 5] = KbBO; 
-    parmsPred[i, 6] = KbRB;
-  }
+    CLintPred[i] = thetaPredM[i, 1]; // CLintPred
+    
+    // Filling coefficient matrix
+    KPred = rep_matrix(0, nCmt, nCmt);
+    
+    KPred[1,1] = -QLU[i]/KbLU/VLU[i];
+    KPred[14,1] =  QLU[i]/KbLU/VLU[i];
+    KPred[2,2] = -QHT[i]/KbHT/VHT[i];
+    KPred[15,2] =  QHT[i]/KbHT/VHT[i];
+    KPred[3,3] = -QBR[i]/KbBR/VBR[i];
+    KPred[15,3] = QBR[i]/KbBR/VBR[i];
+    KPred[4,4] = -QMU[i]/KbMU/VMU[i];
+    KPred[15,4] = QMU[i]/KbMU/VMU[i];
+    KPred[5,5] = -QAD[i]/KbAD/VAD[i];
+    KPred[15,5] = QAD[i]/KbAD/VAD[i];
+    KPred[6,6] = -QSK[i]/KbSK/VSK[i];
+    KPred[15,6] = QSK[i]/KbSK/VSK[i];
+    KPred[7,7] = -QSP[i]/KbSP/VSP[i];
+    KPred[9,7] = QSP[i]/KbSP/VSP[i];
+    KPred[8,8] = -QPA[i]/KbPA/VPA[i];
+    KPred[9,8] = QPA[i]/KbPA/VPA[i];
+    KPred[9,9] = -(CLintPred[i]*fub + QLI[i])/KbLI/VLI[i];
+    KPred[15,9] = QLI[i]/KbLI/VLI[i];
+    KPred[9,10] = QST[i]/KbST/VST[i];
+    KPred[10,10] = -QST[i]/KbST/VST[i];
+    KPred[9,11] = QGU[i]/KbGU/VGU[i];
+    KPred[11,11] = -QGU[i]/KbGU/VGU[i];
+    KPred[12,12] = -QBO[i]/KbBO/VBO[i];
+    KPred[15,12] = QBO[i]/KbBO/VBO[i];
+    KPred[13,13] = -QKI[i]/KbKI/VKI[i];
+    KPred[15,13] = QKI[i]/KbKI/VKI[i];
+    KPred[2,14] =  QHT[i]/VAB[i];
+    KPred[3,14] =  QBR[i]/VAB[i];
+    KPred[4,14] =  QMU[i]/VAB[i];
+    KPred[5,14] =  QAD[i]/VAB[i];
+    KPred[6,14] =  QSK[i]/VAB[i];
+    KPred[7,14] =  QSP[i]/VAB[i];
+    KPred[8,14] =  QPA[i]/VAB[i];
+    KPred[9,14] =  QHA[i]/VAB[i];
+    KPred[10,14] =  QST[i]/VAB[i];
+    KPred[11,14] =  QGU[i]/VAB[i];
+    KPred[12,14] =  QBO[i]/VAB[i];
+    KPred[13,14] =  QKI[i]/VAB[i];
+    KPred[14,14] = -QLU[i]/VAB[i];
+    KPred[16,14] =  QRB[i]/VAB[i];
+    KPred[1,15] =  QLU[i]/VVB[i];
+    KPred[15,15] = -QLU[i]/VVB[i];
+    KPred[15,16] = QRB[i]/KbRB/VRB[i];
+    KPred[16,16] = -QRB[i]/KbRB/VRB[i];
 
-  xPred = pmx_solve_group_rk45(PBPKModelODE, nCmt, len,
-                               time, amt, rate, ii, evid, cmt, addl, ss,
-                               parmsPred, biovar, tlag, WT, idummy,
-                               1e-6, 1e-6, 1e6);
+    xPred[,start[i]:end[i]] = pmx_solve_linode(time[start[i]:end[i]],
+                                      amt[start[i]:end[i]],
+                                      rate[start[i]:end[i]],
+                                      ii[start[i]:end[i]],
+                                      evid[start[i]:end[i]],
+                                      cmt[start[i]:end[i]],
+                                      addl[start[i]:end[i]],
+                                      ss[start[i]:end[i]],
+                                      KPred, biovar, tlag);
 
-  for(i in 1:nSubject) {
     cHatPred[start[i]:end[i]] = xPred[15, start[i]:end[i]] / VVB[i];
-  }
 
-  // predictions for observed data records
-  cHatObsPred = cHatPred[iObs];
+   // predictions for observed data records
+   cHatObsPred = cHatPred[iObs];
 
-  for(i in 1:nObs) {
-    cHatObsCond[i] = exp(normal_rng(log(fmax(machine_precision(), cHatObs[i])), sigma));
-    cHatObsPred[i] = exp(normal_rng(log(fmax(machine_precision(), cHatObsPred[i])), sigma));
+   for(i in 1:nObs) {
+     cHatObsCond[i] = exp(normal_rng(log(fmax(machine_precision(), cHatObs[i])), sigma));
+     cHatObsPred[i] = exp(normal_rng(log(fmax(machine_precision(), cHatObsPred[i])), sigma));
   }
 }

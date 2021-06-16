@@ -15,6 +15,10 @@ compileModel <- function(model, stanDir = stanDir){
   system(paste0("make --directory=", stanDir, " ", model))
 }
 
+compileModelMPI <- function(model, stanDir = stanDir, nslaves = 2){
+  system(paste0("make clean-all; ", "make --directory=", stanDir, " -J", nslaves, " ", model))
+}
+
 runModelOld <- function(model, data, iter, warmup, thin, init, seed, chain = 1,
                      stepsize = 1, adapt_delta = 0.8, max_depth = 10, refresh = 100, tag=NULL){
   modelName <- basename(model)
@@ -54,7 +58,7 @@ runModelMPI <- function(model, data, iter, warmup, thin, init, seed, chain = 1,
                      save_warmup = 0, tag=NULL,
                      nslaves = 2){
   if(! is.null(tag)) output <- paste0(model, "_", tag, "_") else output=model
-  system(paste("mpirun -np ", nslaves, " -l"," ", model, " sample algorithm=hmc engine=nuts",
+  system(paste("mpiexec -n ", nslaves, " -l ", model, " sample algorithm=hmc engine=nuts",
                " max_depth=", max_depth,
                " stepsize=", stepsize,
                " num_samples=", iter - warmup,

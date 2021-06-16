@@ -243,3 +243,14 @@ includegraphics <- function(file,
   }
   return(invisible(NULL))
 }
+
+
+## stats functions
+med <- function(x) quantile(x, probs=c(0.5), na.rm=T)
+lo <- function(x) quantile(x, probs=c(0.05), na.rm=T)
+hi <- function(x) quantile(x, probs=c(0.95), na.rm=T)
+lo10 <- function(x) quantile(x, probs=c(0.1), na.rm=T)
+hi90 <- function(x) quantile(x, probs=c(0.9), na.rm=T)
+lo25 <- function(x) quantile(x, probs=c(0.25), na.rm=T)
+hi75 <- function(x) quantile(x, probs=c(0.75), na.rm=T)
+
