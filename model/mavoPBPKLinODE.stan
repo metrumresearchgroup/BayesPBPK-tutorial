@@ -320,16 +320,17 @@ generated quantities{
     KPred[16,16] = -QRB[i]/KbRB/VRB[i];
 
     xPred[,start[i]:end[i]] = pmx_solve_linode(time[start[i]:end[i]],
-                                      amt[start[i]:end[i]],
-                                      rate[start[i]:end[i]],
-                                      ii[start[i]:end[i]],
-                                      evid[start[i]:end[i]],
-                                      cmt[start[i]:end[i]],
-                                      addl[start[i]:end[i]],
-                                      ss[start[i]:end[i]],
-                                      KPred, biovar, tlag);
+                                              amt[start[i]:end[i]],
+                                              rate[start[i]:end[i]],
+                                              ii[start[i]:end[i]],
+                                              evid[start[i]:end[i]],
+                                              cmt[start[i]:end[i]],
+                                              addl[start[i]:end[i]],
+                                              ss[start[i]:end[i]],
+                                              KPred, biovar, tlag);
 
     cHatPred[start[i]:end[i]] = xPred[15, start[i]:end[i]] / VVB[i];
+  }
 
    // predictions for observed data records
    cHatObsPred = cHatPred[iObs];

@@ -16,7 +16,7 @@ compileModel <- function(model, stanDir = stanDir){
 }
 
 compileModelMPI <- function(model, stanDir = stanDir, nslaves = 2){
-  system(paste0("make clean-all; ", "make --directory=", stanDir, " -J", nslaves, " ", model))
+  system(paste0("make clean-all; ", "make --directory=", stanDir, " -j", nslaves, " ", model))
 }
 
 runModelOld <- function(model, data, iter, warmup, thin, init, seed, chain = 1,

@@ -159,9 +159,9 @@ parameters <- c(parametersToPlot, otherRVs)
 modelFile <- file.path(modelDir, paste(modelName, ".stan", sep = ""))
 
 ## Run Stan
-nChains <- 4
-nPost <- 1000 ## Number of post-burn-in samples per chain after thinning
-nBurn <- 1000 ## Number of burn-in samples per chain after thinning
+nChains <- 2
+nPost <- 5  #1000 ## Number of post-burn-in samples per chain after thinning
+nBurn <- 5  #1000 ## Number of burn-in samples per chain after thinning
 nThin <- 1
 
 nIter <- (nPost + nBurn) * nThin
