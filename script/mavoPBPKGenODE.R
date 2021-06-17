@@ -159,9 +159,9 @@ parameters <- c(parametersToPlot, otherRVs)
 modelFile <- file.path(modelDir, paste(modelName, ".stan", sep = ""))
 
 ## Run Stan
-nChains <- 2
-nPost <- 5  #1000 ## Number of post-burn-in samples per chain after thinning
-nBurn <- 5  #1000 ## Number of burn-in samples per chain after thinning
+nChains <- 4
+nPost <- 1000 ## Number of post-burn-in samples per chain after thinning
+nBurn <- 1000 ## Number of burn-in samples per chain after thinning
 nThin <- 1
 
 nIter <- (nPost + nBurn) * nThin
@@ -240,71 +240,114 @@ if(fitModel){
 #mcmc_dens_overlay(subset.pars, facet_args=list(ncol=4))+facet_text(size=10)+theme(axis.text=element_text(size=10))
 
 if(runAnalysis){
-  df <- rstan::extract(fit)
   
-  ## MCMC diagnostics and posterior distributions of parameters
-  ## Remove diagonal & redundant elements of rho
-  dimRho <- nrow(init()$L)
+  outputFiles <- paste0(file.path(outDir,modelName), sprintf("%01d.csv", 1:nChains))
+  fit <- as_cmdstan_fit(outputFiles)
+  subset.pars <- subset_draws(fit$draws(), variable=parametersToPlot[parametersToPlot != "rho"])
   
-  parametersToPlot <- c(parametersToPlot,
-                        paste("rho[", matrix(apply(expand.grid(1:dimRho, 1:dimRho),
-                                                   1, paste, collapse = ","),
-                                             ncol = dimRho)[upper.tri(diag(dimRho),
-                                                                      diag = FALSE)], "]",
-                              sep = ""))
-  parametersToPlot <- setdiff(parametersToPlot, c("rho"))
+  # plots
+  plot_mcmcDensityByChain <- mcmc_dens_overlay(subset.pars, facet_args=list(ncol=4))+facet_text(size=10)+theme(axis.text=element_text(size=10))
+  plot_mcmcDensity <- mcmc_dens(subset.pars, facet_args=list(ncol=4))+facet_text(size=10)+theme(axis.text=element_text(size=10))
   
-  options(bayesplot.base_size = 12,
-          bayesplot.base_family = "sans")
-  color_scheme_set(scheme = "brightblue")
-  myTheme <- theme(text = element_text(size = 12),
-                   axis.text = element_text(size = 12))
+  ggsave("density.pdf", width=8, height=6)
   
-  rhats <- rhat(fit, pars = parametersToPlot)
-  plot_rhat <- mcmc_rhat(rhats) + yaxis_text() + myTheme
+  ## get data
+  data <- jsonlite::read_json("short_data.json")
   
-  ratios1 <- neff_ratio(fit, pars = parametersToPlot)
-  plot_neff <- mcmc_neff(ratios1) + yaxis_text() + myTheme
+  ## PPC PK
+  cobs.rep <-
+    as_draws_df(fit$draws(variables=c("cHatObsPred"))) %>%
+    select(starts_with("cHatObsPred")) %>% as.matrix()
   
-  plot_mcmcHistory <- mcmcHistory2(fit, pars = parametersToPlot,   #need to get mcmcHistory2 function
-                                   nParPerPage = 5, myTheme = th1)
-  plot_mcmcDensityByChain <- mcmcDensity2(fitPD, pars = parametersToPlot,  ##need to get mcmcDensity2 function
-                                          nParPerPage = 16, byChain = TRUE,
-                                          myTheme = theme(text = element_text(size = 12),
-                                                          axis.text = element_text(size = 10)))
-  plot_mcmcDensity <- mcmcDensity2(fitPD, pars = parametersToPlot, nParPerPage = 16,
-                                   myTheme = theme(text = element_text(size = 12),
-                                                   axis.text = element_text(size = 10)))
+  time <- data[["time"]]
+  nSubjects <- data[["nSubjects"]]
+  nObsPK  <- data[["nObsPK"]]
+  nObsPD  <- data[["nObsPD"]]
+  iObsPK  <- data[["iObsPK"]]
+  iObsPD  <- data[["iObsPD"]]
   
-  # plot_pairs <- ggpairs(as.data.frame(fitPD, pars = parametersToPlot[!grepl("rho",parametersToPlot)]),
-  #                       lower = list(continuous = wrap("points", alpha = 0.3, size = 0.1)),
-  #                       upper = list(continuous = wrap("cor", size = 2))) +
-  #   theme(axis.text = element_text(size = 4),
-  #         strip.text = element_text(size = 4),
-  #         panel.grid.major = element_blank(),
-  #         legend.position = "none",
-  #         axis.ticks = element_blank())
+  ppc_ribbon_grouped(y=data[["cObs"]], yrep=cobs.rep, x=time[iObsPK],
+                     group=as.vector(sapply(1:nSubjects, function(i){rep(i, nObsPK/nSubjects)}))) + scale_x_continuous(name="time (h)") +
+    scale_y_continuous(name="drug plasma concentration (ng/mL)") + theme(axis.text=element_text(size=10))
   
-  plotFile <- mrggsave(list(plot_rhat,
-                            plot_neff,
-                            plot_mcmcHistory,
-                            plot_mcmcDensityByChain,
-                            plot_mcmcDensity),
-                       scriptName,
-                       dir = figDir, stem = paste(modelName, "MCMCDiagnostics", sep = "-"),
-                       onefile = TRUE)
+  ggsave("ppc_pk.pdf", width=8, height=6)
   
-  ptable <- monitor(as.array(fitPD, pars = parametersToPlot),
-                    warmup = 0, print = FALSE)
-  write.csv(ptable, file = file.path(tabDir, paste(modelName,
-                                                   "ParameterTable.csv", sep = "")))
-  ptable %>%
-    formatC(3) %>%
-    as.data.frame %>%
-    rename(SEmean = se_mean, SD = sd, "2.5" = "2.5%", "25" = "25%", "50" = "50%",
-           "75" = "75%", "97.5" = "97.5%", Neff = "n_eff") %>%
-    kable(caption = "Olipudase Bayesian popPKPD: Summary of model parameter estimates. Numeric column headings indicate percentiles of the MCMC samples.")
+  ## PPC PD
+  neut.rep <- 
+    as_draws_df(fit$draws(variables=c("neutHatObsPred"))) %>%
+    select(starts_with("neutHatObsPred")) %>% as.matrix()
   
+  ppc_ribbon_grouped(y=data[["neutObs"]], yrep=neut.rep, x=time[iObsPD],
+                     group=as.vector(sapply(1:nSubjects, function(i){rep(i, nObsPD/nSubjects)}))) + scale_x_continuous(name="time (h)") +
+    scale_y_continuous(name="ANC") + theme(axis.text=element_text(size=10))
+  
+  ggsave("ppc_pd.pdf", width=8, height=6)
+  
+  # df <- rstan::extract(fit)
+  # 
+  # ## MCMC diagnostics and posterior distributions of parameters
+  # ## Remove diagonal & redundant elements of rho
+  # dimRho <- nrow(init()$L)
+  # 
+  # parametersToPlot <- c(parametersToPlot,
+  #                       paste("rho[", matrix(apply(expand.grid(1:dimRho, 1:dimRho),
+  #                                                  1, paste, collapse = ","),
+  #                                            ncol = dimRho)[upper.tri(diag(dimRho),
+  #                                                                     diag = FALSE)], "]",
+  #                             sep = ""))
+  # parametersToPlot <- setdiff(parametersToPlot, c("rho"))
+  # 
+  # options(bayesplot.base_size = 12,
+  #         bayesplot.base_family = "sans")
+  # color_scheme_set(scheme = "brightblue")
+  # myTheme <- theme(text = element_text(size = 12),
+  #                  axis.text = element_text(size = 12))
+  # 
+  # rhats <- rhat(fit, pars = parametersToPlot)
+  # plot_rhat <- mcmc_rhat(rhats) + yaxis_text() + myTheme
+  # 
+  # ratios1 <- neff_ratio(fit, pars = parametersToPlot)
+  # plot_neff <- mcmc_neff(ratios1) + yaxis_text() + myTheme
+  # 
+  # plot_mcmcHistory <- mcmcHistory2(fit, pars = parametersToPlot,   #need to get mcmcHistory2 function
+  #                                  nParPerPage = 5, myTheme = th1)
+  # plot_mcmcDensityByChain <- mcmcDensity2(fitPD, pars = parametersToPlot,  ##need to get mcmcDensity2 function
+  #                                         nParPerPage = 16, byChain = TRUE,
+  #                                         myTheme = theme(text = element_text(size = 12),
+  #                                                         axis.text = element_text(size = 10)))
+  # plot_mcmcDensity <- mcmcDensity2(fitPD, pars = parametersToPlot, nParPerPage = 16,
+  #                                  myTheme = theme(text = element_text(size = 12),
+  #                                                  axis.text = element_text(size = 10)))
+  # 
+  # # plot_pairs <- ggpairs(as.data.frame(fitPD, pars = parametersToPlot[!grepl("rho",parametersToPlot)]),
+  # #                       lower = list(continuous = wrap("points", alpha = 0.3, size = 0.1)),
+  # #                       upper = list(continuous = wrap("cor", size = 2))) +
+  # #   theme(axis.text = element_text(size = 4),
+  # #         strip.text = element_text(size = 4),
+  # #         panel.grid.major = element_blank(),
+  # #         legend.position = "none",
+  # #         axis.ticks = element_blank())
+  # 
+  # plotFile <- mrggsave(list(plot_rhat,
+  #                           plot_neff,
+  #                           plot_mcmcHistory,
+  #                           plot_mcmcDensityByChain,
+  #                           plot_mcmcDensity),
+  #                      scriptName,
+  #                      dir = figDir, stem = paste(modelName, "MCMCDiagnostics", sep = "-"),
+  #                      onefile = TRUE)
+  # 
+  # ptable <- monitor(as.array(fitPD, pars = parametersToPlot),
+  #                   warmup = 0, print = FALSE)
+  # write.csv(ptable, file = file.path(tabDir, paste(modelName,
+  #                                                  "ParameterTable.csv", sep = "")))
+  # ptable %>%
+  #   formatC(3) %>%
+  #   as.data.frame %>%
+  #   rename(SEmean = se_mean, SD = sd, "2.5" = "2.5%", "25" = "25%", "50" = "50%",
+  #          "75" = "75%", "97.5" = "97.5%", Neff = "n_eff") %>%
+  #   kable(caption = "Olipudase Bayesian popPKPD: Summary of model parameter estimates. Numeric column headings indicate percentiles of the MCMC samples.")
+  # 
   
   #------------------------------------------------------------------------------#
   
