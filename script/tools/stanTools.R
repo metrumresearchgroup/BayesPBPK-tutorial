@@ -206,38 +206,38 @@ mcmcDensity <- function(fit, pars = names(fit), byChain = FALSE, nParPerPage = 1
   NULL
 }
 
-summary.mcmc.list <- function (object, quantiles = c(0.025, 0.25, 0.5, 0.75, 0.975), 
-    ...) 
-{
-    x <- mcmc.list(object)
-    statnames <- c("Mean", "SD", "Naive SE", "Time-series SE")
-    varstats <- matrix(nrow = nvar(x), ncol = length(statnames), 
-        dimnames = list(varnames(x), statnames))
-    xtsvar <- matrix(nrow = nchain(x), ncol = nvar(x))
-    if (is.matrix(x[[1]])) {
-        for (i in 1:nchain(x)) for (j in 1:nvar(x)) xtsvar[i, 
-            j] <- coda:::safespec0(x[[i]][, j])
-        xlong <- do.call("rbind", x)
-    }
-    else {
-        for (i in 1:nchain(x)) xtsvar[i, ] <- coda:::safespec0(x[[i]])
-        xlong <- as.matrix(x)
-    }
-    xmean <- apply(xlong, 2, mean, na.rm = TRUE)
-    xvar <- apply(xlong, 2, var, na.rm = TRUE)
-    xtsvar <- apply(xtsvar, 2, mean, na.rm = TRUE)
-    varquant <- t(apply(xlong, 2, quantile, quantiles, na.rm = TRUE))
-    varstats[, 1] <- xmean
-    varstats[, 2] <- sqrt(xvar)
-    varstats[, 3] <- sqrt(xvar/(niter(x) * nchain(x)))
-    varstats[, 4] <- sqrt(xtsvar/(niter(x) * nchain(x)))
-    varquant <- drop(varquant)
-    varstats <- drop(varstats)
-    out <- list(statistics = varstats, quantiles = varquant, 
-        start = start(x), end = end(x), thin = thin(x), nchain = nchain(x))
-    class(out) <- "summary.mcmc"
-    return(out)
-}
+# summary.mcmc.list <- function (object, quantiles = c(0.025, 0.25, 0.5, 0.75, 0.975), 
+#     ...) 
+# {
+#     x <- mcmc.list(object)
+#     statnames <- c("Mean", "SD", "Naive SE", "Time-series SE")
+#     varstats <- matrix(nrow = nvar(x), ncol = length(statnames), 
+#         dimnames = list(varnames(x), statnames))
+#     xtsvar <- matrix(nrow = nchain(x), ncol = nvar(x))
+#     if (is.matrix(x[[1]])) {
+#         for (i in 1:nchain(x)) for (j in 1:nvar(x)) xtsvar[i, 
+#             j] <- coda:::safespec0(x[[i]][, j])
+#         xlong <- do.call("rbind", x)
+#     }
+#     else {
+#         for (i in 1:nchain(x)) xtsvar[i, ] <- coda:::safespec0(x[[i]])
+#         xlong <- as.matrix(x)
+#     }
+#     xmean <- apply(xlong, 2, mean, na.rm = TRUE)
+#     xvar <- apply(xlong, 2, var, na.rm = TRUE)
+#     xtsvar <- apply(xtsvar, 2, mean, na.rm = TRUE)
+#     varquant <- t(apply(xlong, 2, quantile, quantiles, na.rm = TRUE))
+#     varstats[, 1] <- xmean
+#     varstats[, 2] <- sqrt(xvar)
+#     varstats[, 3] <- sqrt(xvar/(niter(x) * nchain(x)))
+#     varstats[, 4] <- sqrt(xtsvar/(niter(x) * nchain(x)))
+#     varquant <- drop(varquant)
+#     varstats <- drop(varstats)
+#     out <- list(statistics = varstats, quantiles = varquant, 
+#         start = start(x), end = end(x), thin = thin(x), nchain = nchain(x))
+#     class(out) <- "summary.mcmc"
+#     return(out)
+# }
 
 parameterTable <- function(fit, pars = names(fit), chains = NULL){
   posterior <- as.array(fit, pars = pars)

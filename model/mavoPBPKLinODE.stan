@@ -249,8 +249,9 @@ generated quantities{
   matrix[nCmt, nt] xPred;
   matrix[nCmt, nCmt] KPred;
   row_vector[nt] cHatPred;
-  vector<lower = 0>[nObs] cHatObsCond;
-  row_vector<lower = 0>[nObs] cHatObsPred;
+  row_vector[nObs] cHatObsPred;
+  vector<lower = 0>[nObs] cObsCond;
+  row_vector<lower = 0>[nObs] cObsPred;
 
   // Variables for IIV  
   matrix[nIIV, nSubject] etaStdPred;
@@ -336,7 +337,7 @@ generated quantities{
    cHatObsPred = cHatPred[iObs];
 
    for(i in 1:nObs) {
-     cHatObsCond[i] = exp(normal_rng(log(fmax(machine_precision(), cHatObs[i])), sigma));
-     cHatObsPred[i] = exp(normal_rng(log(fmax(machine_precision(), cHatObsPred[i])), sigma));
+     cObsCond[i] = exp(normal_rng(log(fmax(machine_precision(), cHatObs[i])), sigma));  // individual predictions
+     cObsPred[i] = exp(normal_rng(log(fmax(machine_precision(), cHatObsPred[i])), sigma));  // population predictions
   }
 }

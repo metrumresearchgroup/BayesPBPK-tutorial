@@ -174,13 +174,13 @@ if(fitModel){
   compileModelMPI(model = file.path(outDir, modelName), stanDir = stanDir, nslaves = nslaves)
   
   ##  mpi.spawn.Rslaves(nslaves = nslaves)
-  #RNGkind("L'Ecuyer-CMRG")
-  #mc.reset.stream()
+  RNGkind("L'Ecuyer-CMRG")
+  mc.reset.stream()
   
   chains <- 1:nChains
   startTime <- Sys.time()
   # given that I only have 6 functional cores on laptop, using mclapply won't help much
-  lapply(chains,
+  mclapply(chains,
          function(chain, model, data, iter, warmup, thin, init) {
            outDir <- file.path(outDir, chain)
            dir.create(outDir)
@@ -207,8 +207,8 @@ if(fitModel){
          model = file.path(outDir, modelName),
          data = data,
          init = init,
-         iter = nIter, warmup = nBurnin, thin = nThin)
-  #mc.cores = min(nChains, detectCores()))
+         iter = nIter, warmup = nBurnin, thin = nThin,
+         mc.cores = min(nChains, detectCores()))
   endTime <- Sys.time()
   elapsedTime <- endTime - startTime
   elapsedTime
@@ -227,8 +227,6 @@ if(fitModel){
 ################################## Analysis ####################################
 ################################################################################
 
-#-----------------------------# diagnostics #----------------------------------#
-
 #fit <- as_cmdstan_fit(dir(pattern="output.[1-4].csv",full.names=TRUE))
 #fit <- as_cmdstan_fit(dir(pattern="output.csv",full.names=TRUE))
 
@@ -241,47 +239,104 @@ if(fitModel){
 
 if(runAnalysis){
   
+  myTheme <- theme(text = element_text(size = 12), axis.text = element_text(size = 12))
+  
+  # get fit
+  parametersToPlot <- setdiff(parametersToPlot, "rho")
   outputFiles <- paste0(file.path(outDir,modelName), sprintf("%01d.csv", 1:nChains))
   fit <- as_cmdstan_fit(outputFiles)
   subset.pars <- subset_draws(fit$draws(), variable=parametersToPlot[parametersToPlot != "rho"])
   
-  # plots
+  ## diagnostics ##
+  # summary
+  fitSumm <- fit$summary()
+  
+  # density
   plot_mcmcDensityByChain <- mcmc_dens_overlay(subset.pars, facet_args=list(ncol=4))+facet_text(size=10)+theme(axis.text=element_text(size=10))
   plot_mcmcDensity <- mcmc_dens(subset.pars, facet_args=list(ncol=4))+facet_text(size=10)+theme(axis.text=element_text(size=10))
   
-  ggsave("density.pdf", width=8, height=6)
+  # rhat
+  rhats <- bayesplot::rhat(fit, pars = parametersToPlot)
+  plot_rhat <- mcmc_rhat(rhats) + yaxis_text() + myTheme
   
+  # neff
+  ratios1 <- bayesplot::neff_ratio(fit, pars = parametersToPlot)
+  plot_neff <- mcmc_neff(ratios1) + yaxis_text() + myTheme
+  
+  # history
+  draws_array <- fit$draws()
+  plot_mcmcHistory <- mcmc_trace(draws_array, pars = parametersToPlot)
+  
+  # correlation
+  plot_pairs <- mcmc_pairs(draws_array, pars = parametersToPlot, off_diag_args = list(size = 1.5), diag_fun = "dens")
+  
+  #ggsave("density.pdf", width=8, height=6)
+  
+  ## predictive checks ##
   ## get data
-  data <- jsonlite::read_json("short_data.json")
+  data <- read_rdump(file.path(outDir, "1", "data.R"))
   
-  ## PPC PK
-  cobs.rep <-
-    as_draws_df(fit$draws(variables=c("cHatObsPred"))) %>%
-    select(starts_with("cHatObsPred")) %>% as.matrix()
+  # get cobsPred and cobsCond
+  cobsCond.rep <-
+    as_draws_df(fit$draws(variables=c("cObsCond"))) %>%
+    select(starts_with("cObsCond")) %>% as.matrix()
+  
+  cobsPred.rep <-
+    as_draws_df(fit$draws(variables=c("cObsPred"))) %>%
+    select(starts_with("cObsPred")) %>% as.matrix()
   
   time <- data[["time"]]
-  nSubjects <- data[["nSubjects"]]
-  nObsPK  <- data[["nObsPK"]]
-  nObsPD  <- data[["nObsPD"]]
-  iObsPK  <- data[["iObsPK"]]
-  iObsPD  <- data[["iObsPD"]]
+  nSubject <- data[["nSubject"]]
+  nObs  <- data[["nObs"]]
+  iObs  <- data[["iObs"]]
+  cObs <- data[["cObs"]]
+  nti <- data[["nti"]]
+  recByID <- unlist(sapply(1:nSubject, function(i){rep(i, nti[i])}))
+  obsByID <- recByID[iObs]
   
-  ppc_ribbon_grouped(y=data[["cObs"]], yrep=cobs.rep, x=time[iObsPK],
-                     group=as.vector(sapply(1:nSubjects, function(i){rep(i, nObsPK/nSubjects)}))) + scale_x_continuous(name="time (h)") +
-    scale_y_continuous(name="drug plasma concentration (ng/mL)") + theme(axis.text=element_text(size=10))
+  plot_ppc_cobsPred <- ppc_ribbon_grouped(y=data[["cObs"]], yrep=cobsPred.rep, x=time[iObs],
+                                          group=obsByID) + scale_x_continuous(name="time (h)") +
+    scale_y_continuous(name="Plasma concentration (ng/mL)") + theme(axis.text=element_text(size=10))
   
-  ggsave("ppc_pk.pdf", width=8, height=6)
+  # ppc summary plot
+  # get observed data
+  df_cobs <- tibble(ID = obsByID,
+                    time = time[iObs],
+                    obs = cObs)
   
-  ## PPC PD
-  neut.rep <- 
-    as_draws_df(fit$draws(variables=c("neutHatObsPred"))) %>%
-    select(starts_with("neutHatObsPred")) %>% as.matrix()
+  # get predictions
+  df_cobsCond <- as_tibble(t(cobsCond.rep)) %>%
+    mutate(ID = obsByID, time = time[iObs]) %>%
+    gather(sim, pred, -ID, -time) %>%
+    mutate(sim = as.integer(gsub("V","",sim))) %>%
+    select(sim, ID, time, pred)
   
-  ppc_ribbon_grouped(y=data[["neutObs"]], yrep=neut.rep, x=time[iObsPD],
-                     group=as.vector(sapply(1:nSubjects, function(i){rep(i, nObsPD/nSubjects)}))) + scale_x_continuous(name="time (h)") +
-    scale_y_continuous(name="ANC") + theme(axis.text=element_text(size=10))
+  df_cobsPred <- as_tibble(t(cobsPred.rep)) %>%
+    mutate(ID = obsByID, time = time[iObs]) %>%
+    gather(sim, pred, -ID, -time) %>%
+    mutate(sim = as.integer(gsub("V","",sim))) %>%
+    select(sim, ID, time, pred)
   
-  ggsave("ppc_pd.pdf", width=8, height=6)
+  plot_ppc_cobsPred_summ <- vpc(sim = df_cobsPred,
+                                obs = df_cobs,                               # supply simulation and observation dataframes
+                                obs_cols = list(
+                                  id = "ID",
+                                  dv = "obs",                             # these column names are the default,
+                                  idv = "time"),                         # update these if different.
+                                sim_cols = list(
+                                  id = "ID",
+                                  dv = "pred",
+                                  idv = "time",
+                                  sim = "sim"),
+                                #bins = c(0, 2, 4, 6, 8, 10, 16, 25),     # specify bin separators manually
+                                pi = c(0.1, 0.9),                      # prediction interval simulated data to show
+                                ci = c(0.05, 0.95),                      # confidence intervals to show
+                                pred_corr = FALSE,                       # perform prediction-correction?
+                                show = list(obs_dv = TRUE),              # plot observations?
+                                ylab = "Concentration",
+                                xlab = "Time (hrs)")
+  
+  #ggsave("ppc.pdf", width=8, height=6)
   
   # df <- rstan::extract(fit)
   # 
@@ -354,5 +409,201 @@ if(runAnalysis){
   #-------------------------# predictive checks #--------------------------------#
   
   #------------------------------------------------------------------------------#
+  # ## Posterior predictive checks
+  # 
+  # ## Individual PPC
+  # 
+  # # get individual and population predictions
+  # predInd <- as.data.frame(fit, pars = "cObsCond") %>%
+  #   gather(factor_key = TRUE) %>%
+  #   group_by(key) %>%
+  #   summarise(lbIndPK = quantile(value, probs = 0.05, na.rm = TRUE),
+  #             medianIndPK = quantile(value, probs = 0.5, na.rm = TRUE),
+  #             ubIndPK = quantile(value, probs = 0.95, na.rm = TRUE))
+  # 
+  # predPop <- as.data.frame(fit, pars = "cObsPred") %>%
+  #   gather(factor_key = TRUE) %>%
+  #   group_by(key) %>%
+  #   summarise(lbPopPK = quantile(value, probs = 0.05, na.rm = TRUE),
+  #             medianPopPK = quantile(value, probs = 0.5, na.rm = TRUE),
+  #             ubPopPK = quantile(value, probs = 0.95, na.rm = TRUE))
+  # 
+  # ## Bind all
+  # brks <- seq(0,16,4)
+  # predAll <- bind_cols(dat, predInd, predPop) %>%
+  #   mutate(IDX = dense_rank(subject),
+  #          GP = cut(IDX, breaks=brks, labels=F),
+  #          #replace BLQ data with LLOQ
+  #          conc = ifelse(BLQ==1, loq, conc),
+  #          #make new dose column for rounded doses
+  #          DOSE2 = paste(signif(DOSE, 1), "mg/kg")) %>%
+  #   #get fixed TAD
+  #   group_by(subject) %>%
+  #   mutate(DOSETIME = ifelse(evid==1, time, NA)) %>%
+  #   fill(DOSETIME) %>%
+  #   fill(DOSETIME, .direction="up") %>%
+  #   ungroup() %>%
+  #   mutate(TAD2 = time - DOSETIME,
+  #          POPULATION = as.factor(ifelse(subject >= 300 & subject < 400, "Pediatric", "Adult")),
+  #          subject2 = paste("ID:", subject))
+  # 
+  # gps <- unique(predAll$GP)
+  # 
+  # #linear scale
+  # predAll2 <- predAll #not filter for BLQ if want to plot all data
+  # 
+  # ## plot zoomed in plots for multiple dose patients
+  # idsMultiple <- pkpdData7 %>%
+  #   filter(ANALYTE == "Dosing") %>%
+  #   group_by(subject) %>%
+  #   filter(n() > 1) %>%
+  #   distinct(subject)
+  # 
+  # #linear scale
+  # ##PK
+  # predZoomPK <- predAll2 %>%
+  #   filter(ANALYTE == "Olipudase") %>%
+  #   group_by(subject) %>%
+  #   mutate(deltaTime = time - lag(time),
+  #          DVGroup = ifelse(deltaTime > 100, 1, 0),
+  #          DVGroup = ifelse(is.na(DVGroup), 0, DVGroup),
+  #          DVGroup2 = cumsum(DVGroup) + 1,
+  #          subject2 = paste("ID:", subject)) %>%
+  #   ungroup() %>%
+  #   mutate(BLQ = ifelse(BLQ==1, BLQ, 0),
+  #          obs = ifelse(BLQ==0, conc, NA),
+  #          blq = ifelse(BLQ==1, conc, NA))
+  # 
+  # idsPK <- unique(predZoomPK$subject2)
+  # 
+  # plot_PPCZoomPK <- mclapply(idsPK, function(thisGroup){
+  #   ggplot(predZoomPK %>% filter(subject2==thisGroup) %>% mutate(time=time/24), aes(x=time)) +
+  #     geom_line(aes(x = time, y = medianPopPK, color = "PRED")) +
+  #     geom_ribbon(aes(ymin = lbPopPK, ymax = ubPopPK), alpha = 0.25, fill = "blue") +
+  #     geom_line(aes(x = time, y = medianIndPK, color = "IPRED")) +
+  #     geom_ribbon(aes(ymin = lbIndPK, ymax = ubIndPK), alpha = 0.25, fill = "red") +
+  #     geom_point(aes(y=obs, col="Obs")) +
+  #     geom_point(aes(y=blq, col="Blq")) +
+  #     scale_colour_manual(name='',
+  #                         values = c('Obs'='black',
+  #                                    'Blq'='red',
+  #                                    'PRED'='blue',
+  #                                    'IPRED'='red'),
+  #                         breaks=c("Obs","Blq","PRED","IPRED")) +
+  #     guides(colour = guide_legend(override.aes = list(linetype=c(0,0,1,1), shape=c(16, 16, NA, NA)))) +
+  #     labs(title = thisGroup, x = "time (d)", y = "Olipudase alpha plasma concentration (mg/L)") +
+  #     theme(text = element_text(size = 10),
+  #           axis.text = element_text(size = 10),
+  #           legend.position = "top",
+  #           strip.text = element_text(size = 8)) +
+  #     facet_wrap(~ DVGroup2 + DOSE2, scales="free", ncol=4) +
+  #     theme_bw()
+  # })
+  # 
+  # #log scale
+  # predZoomPKlog <- predZoomPK %>%
+  #   filter(time > 0)
+  # 
+  # plot_PPCZoomPKlog <- mclapply(idsPK, function(thisGroup){
+  #   ggplot(predZoomPKlog %>% filter(subject2==thisGroup) %>% mutate(time=time/24), aes(x=time)) +
+  #     geom_line(aes(x = time, y = medianPopPK, color = "PRED")) +
+  #     geom_ribbon(aes(ymin = lbPopPK, ymax = ubPopPK), alpha = 0.25, fill = "blue") +
+  #     geom_line(aes(x = time, y = medianIndPK, color = "IPRED")) +
+  #     geom_ribbon(aes(ymin = lbIndPK, ymax = ubIndPK), alpha = 0.25, fill = "red") +
+  #     geom_point(aes(y=obs, col="Obs")) +
+  #     geom_point(aes(y=blq, col="Blq")) +
+  #     scale_colour_manual(name='',
+  #                         values = c('Obs'='black',
+  #                                    'Blq'='red',
+  #                                    'PRED'='blue',
+  #                                    'IPRED'='red'),
+  #                         breaks=c("Obs","Blq","PRED","IPRED")) +
+  #     guides(colour = guide_legend(override.aes = list(linetype=c(0,0,1,1), shape=c(16, 16, NA, NA)))) +
+  #     labs(title = thisGroup, x = "time (d)", y = "Olipudase alpha plasma concentration (mg/L)") +
+  #     theme(text = element_text(size = 10),
+  #           axis.text = element_text(size = 10),
+  #           legend.position = "top",
+  #           strip.text = element_text(size = 8)) +
+  #     facet_wrap(~ DVGroup2 + DOSE2, scales="free", ncol=4) +
+  #     theme_bw() +
+  #     scale_y_log10()
+  # })
+  # 
+  # # save
+  # plotFile <- mrggsave(list(plot_PPCZoomPK, plot_PPCZoomPKlog),
+  #                      scriptName,
+  #                      dir = figDir, stem = paste(modelName,"PPCPK", sep = "-"),
+  #                      onefile = TRUE,
+  #                      width=10, height=10)
+  # 
+  # 
+  # ##PD
+  # 
+  # predZoomPD <- predAll2 %>%
+  #   filter(ANALYTE == "PSMLyso") %>%
+  #   mutate(deltaTime = time - lag(time),
+  #          DVGroup = ifelse(deltaTime > 100, 1, 0),
+  #          DVGroup = ifelse(is.na(DVGroup), 0, DVGroup),
+  #          DVGroup2 = cumsum(DVGroup) + 1,
+  #          subject2 = paste("ID:", subject))
+  # 
+  # idsPKPD <- unique(predZoomPD$subject2)
+  # 
+  # plot_PPCZoomPD <- mclapply(idsPKPD, function(thisGroup){
+  #   ggplot(predZoomPD %>% filter(subject2==thisGroup) %>% mutate(time=time/24), aes(x=time)) +
+  #     geom_line(aes(x = time, y = medianPopPD, color = "PRED")) +
+  #     geom_ribbon(aes(ymin = lbPopPD, ymax = ubPopPD), alpha = 0.25, fill = "blue") +
+  #     geom_line(aes(x = time, y = medianIndPD, color = "IPRED")) +
+  #     geom_ribbon(aes(ymin = lbIndPD, ymax = ubIndPD), alpha = 0.25, fill = "red") +
+  #     geom_point(aes(y=conc, col="Obs")) +
+  #     scale_colour_manual(name='',
+  #                         values = c('Obs'='black',
+  #                                    'PRED'='blue',
+  #                                    'IPRED'='red'),
+  #                         breaks=c("Obs","PRED","IPRED")) +
+  #     guides(colour = guide_legend(override.aes = list(linetype=c(0,1,1), shape=c(16, NA, NA)))) +
+  #     labs(title = thisGroup, x = "time (d)", y = "Plasma lysosphingomyelin concentration (mg/L)") +
+  #     theme(text = element_text(size = 10),
+  #           axis.text = element_text(size = 10),
+  #           legend.position = "top",
+  #           strip.text = element_text(size = 8)) +
+  #     #facet_wrap(~ DOSE2, scales="free", ncol=4) +
+  #     theme_bw()
+  # })
+  # 
+  # #log scale
+  # predZoomPDlog <- predZoomPD %>%
+  #   filter(time > 0)
+  # 
+  # plot_PPCZoomPDlog <- mclapply(idsPKPD, function(thisGroup){
+  #   ggplot(predZoomPD %>% filter(subject2==thisGroup) %>% mutate(time=time/24), aes(x=time)) +
+  #     geom_line(aes(x = time, y = medianPopPD, color = "PRED")) +
+  #     geom_ribbon(aes(ymin = lbPopPD, ymax = ubPopPD), alpha = 0.25, fill = "blue") +
+  #     geom_line(aes(x = time, y = medianIndPD, color = "IPRED")) +
+  #     geom_ribbon(aes(ymin = lbIndPD, ymax = ubIndPD), alpha = 0.25, fill = "red") +
+  #     geom_point(aes(y=conc, col="Obs")) +
+  #     scale_colour_manual(name='',
+  #                         values = c('Obs'='black',
+  #                                    'PRED'='blue',
+  #                                    'IPRED'='red'),
+  #                         breaks=c("Obs","PRED","IPRED")) +
+  #     guides(colour = guide_legend(override.aes = list(linetype=c(0,1,1), shape=c(16, NA, NA)))) +
+  #     labs(title = thisGroup, x = "time (d)", y = "Plasma lysosphingomyelin concentration (mg/L)") +
+  #     theme(text = element_text(size = 10),
+  #           axis.text = element_text(size = 10),
+  #           legend.position = "top",
+  #           strip.text = element_text(size = 8)) +
+  #     #facet_wrap(~ DOSE2, scales="free", ncol=4) +
+  #     theme_bw() +
+  #     scale_y_log10()
+  # })
+  # 
+  # 
+  # # save
+  # plotFile <- mrggsave(list(plot_PPCZoomPD, plot_PPCZoomPDlog),
+  #                      scriptName,
+  #                      dir = figDir, stem = paste(modelName,"PPCPD", sep = "-"),
+  #                      onefile = TRUE,
+  #                      width=10, height=10)
   
 }

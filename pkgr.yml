@@ -16,6 +16,7 @@ Packages:
   - kableExtra
   - cmdstanr
   - posterior
+  - vpc
 
 Repos:
   - MPN: https://mpn.metworx.com/snapshots/stable/2021-04-15/
