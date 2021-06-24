@@ -143,9 +143,9 @@ parameters{
 }
 
 transformed parameters{
-  row_vector[nt] cHat;
-  row_vector[nObs] cHatObs;
-  matrix[nCmt, nt] x;
+  row_vector<lower = 0>[nt] cHat;
+  row_vector<lower = 0>[nObs] cHatObs;
+  matrix<lower = 0>[nCmt, nt] x;
   matrix[nCmt, nCmt] K;
   
   // variables for Matt's trick
@@ -246,10 +246,10 @@ model{
 }
 
 generated quantities{
-  matrix[nCmt, nt] xPred;
+  matrix<lower = 0>[nCmt, nt] xPred;
   matrix[nCmt, nCmt] KPred;
-  row_vector[nt] cHatPred;
-  row_vector[nObs] cHatObsPred;
+  row_vector<lower = 0>[nt] cHatPred;
+  row_vector<lower = 0>[nObs] cHatObsPred;
   vector<lower = 0>[nObs] cObsCond;
   row_vector<lower = 0>[nObs] cObsPred;
 

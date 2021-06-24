@@ -160,8 +160,8 @@ modelFile <- file.path(modelDir, paste(modelName, ".stan", sep = ""))
 
 ## Run Stan
 nChains <- 4
-nPost <- 1000 ## Number of post-burn-in samples per chain after thinning
-nBurn <- 1000 ## Number of burn-in samples per chain after thinning
+nPost <- 250 ## Number of post-burn-in samples per chain after thinning
+nBurn <- 250 ## Number of burn-in samples per chain after thinning
 nThin <- 1
 
 nIter <- (nPost + nBurn) * nThin
@@ -227,16 +227,6 @@ if(fitModel){
 ################################## Analysis ####################################
 ################################################################################
 
-#fit <- as_cmdstan_fit(dir(pattern="output.[1-4].csv",full.names=TRUE))
-#fit <- as_cmdstan_fit(dir(pattern="output.csv",full.names=TRUE))
-
-#subset.pars <- subset_draws(fit$draws(), variable=parametersToPlot)
-
-## Write summary
-#write.csv(summarise_draws(subset.pars), file="summary_pars.csv")
-
-#mcmc_dens_overlay(subset.pars, facet_args=list(ncol=4))+facet_text(size=10)+theme(axis.text=element_text(size=10))
-
 if(runAnalysis){
   
   myTheme <- theme(text = element_text(size = 12), axis.text = element_text(size = 12))
@@ -249,7 +239,8 @@ if(runAnalysis){
   
   ## diagnostics ##
   # summary
-  fitSumm <- fit$summary()
+  # fitSumm <- fit$summary()  # this will grab all model outputs
+  fitSummParams <- fit$summary(variables = parametersToPlot)
   
   # density
   plot_mcmcDensityByChain <- mcmc_dens_overlay(subset.pars, facet_args=list(ncol=4))+facet_text(size=10)+theme(axis.text=element_text(size=10))
@@ -270,7 +261,17 @@ if(runAnalysis){
   # correlation
   plot_pairs <- mcmc_pairs(draws_array, pars = parametersToPlot, off_diag_args = list(size = 1.5), diag_fun = "dens")
   
-  #ggsave("density.pdf", width=8, height=6)
+  # save
+  plotFile <- mrggsave(list(plot_rhat,
+                            plot_neff,
+                            plot_mcmcHistory,
+                            plot_mcmcDensityByChain,
+                            plot_mcmcDensity),
+                       scriptName,
+                       dir = figDir, stem = paste(modelName, "MCMCDiagnostics", sep = "-"),
+                       onefile = TRUE)
+  
+  #############
   
   ## predictive checks ##
   ## get data
@@ -335,6 +336,14 @@ if(runAnalysis){
                                 show = list(obs_dv = TRUE),              # plot observations?
                                 ylab = "Concentration",
                                 xlab = "Time (hrs)")
+  
+  # save
+  plotFile <- mrggsave(list(plot_ppc_cobsPred, 
+                            plot_ppc_cobsPred_summ),
+                       scriptName,
+                       dir = figDir, stem = paste(modelName,"PPC", sep = "-"),
+                       onefile = TRUE,
+                       width=10, height=10)
   
   #ggsave("ppc.pdf", width=8, height=6)
   
