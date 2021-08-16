@@ -2,7 +2,6 @@ functions{
   real[] PBPKModelODE(real t, real[] x, real[] parms, real[] rdummy, int[] idummy){
     real dxdt[16];
     real WT = rdummy[1];
-    //print(WT);
     
     //// fixed parameters ////
     // Regional blood flows
@@ -136,6 +135,7 @@ transformed data{
   int len[nSubject];
   real<lower = 0> WT[nSubject, 1]; 
   int<lower = 0> idummy[nSubject, 1];
+  real BP = 0.61;      // Blood:plasma partition coefficient
   
   for (i in 1:nSubject) {
     for (j in 1:nCmt) {
@@ -195,7 +195,7 @@ transformed parameters{
                            1e-6, 1e-6, 1e6);
                 
   for(i in 1:nSubject) {             
-    cHat[start[i]:end[i]] = x[15, start[i]:end[i]] / VVB[i];  // divide by subject's blood volume VVB
+    cHat[start[i]:end[i]] = x[15, start[i]:end[i]] / (VVB[i]*BP/1000);  // divide by subject's blood volume VVB
   }
   cHatObs = cHat[iObs];
 }
@@ -256,7 +256,7 @@ generated quantities{
                                1e-6, 1e-6, 1e6);
 
   for(i in 1:nSubject) {
-    cHatPred[start[i]:end[i]] = xPred[15, start[i]:end[i]] / VVB[i];
+    cHatPred[start[i]:end[i]] = xPred[15, start[i]:end[i]] / (VVB[i]*BP/1000);
   }
 
   // predictions for observed data records

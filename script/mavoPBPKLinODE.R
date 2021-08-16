@@ -53,6 +53,7 @@ library(future.apply)
 library(cmdstanr)
 library(posterior)
 library(vpc)
+library(mrggsave)
 
 source(file.path(toolsDir, "stanTools.R"))
 source(file.path(toolsDir, "functions.R"))
@@ -189,21 +190,21 @@ if(fitModel){
            inits <- init()
            with(inits, stan_rdump(ls(inits), file = file.path(outDir, "init.R")))
            ## run without MPI parallelization
-           # runModel(model = model, data = file.path(outDir, "data.R"),
-           #          iter = iter, warmup = warmup, thin = thin,
-           #          init = file.path(outDir, "init.R"),
-           #          seed = sample(1:999999, 1),
-           #          chain = chain)
-           ## run with MPI parallelization
-           runModelMPI(model = model, data = file.path(outDir, "data.R"),
-                       iter = iter, warmup = warmup, thin = thin,
-                       save_warmup = 0,
-                       init = file.path(outDir, "init.R"),
-                       seed = sample(1:999999, 1),
-                       adapt_delta = 0.95, stepsize = 0.01,
-                       refresh = 1,
-                       chain = chain,
-                       nslaves = nslaves)
+           runModel(model = model, data = file.path(outDir, "data.R"),
+                    iter = iter, warmup = warmup, thin = thin,
+                    init = file.path(outDir, "init.R"),
+                    seed = sample(1:999999, 1),
+                    chain = chain)
+           # run with MPI parallelization
+           # runModelMPI(model = model, data = file.path(outDir, "data.R"),
+           #             iter = iter, warmup = warmup, thin = thin,
+           #             save_warmup = 0,
+           #             init = file.path(outDir, "init.R"),
+           #             seed = sample(1:999999, 1),
+           #             adapt_delta = 0.95, stepsize = 0.01,
+           #             refresh = 1,
+           #             chain = chain,
+           #             nslaves = nslaves)
          },
          model = file.path(outDir, modelName),
          data = data,

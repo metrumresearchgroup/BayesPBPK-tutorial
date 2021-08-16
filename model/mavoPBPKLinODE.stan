@@ -220,7 +220,7 @@ transformed parameters{
                                           ss[start[i]:end[i]],
                                           K, biovar, tlag);
            
-    cHat[start[i]:end[i]] = x[15, start[i]:end[i]] / VVB[i];  // divide by subject's blood volume VVB
+    cHat[start[i]:end[i]] = x[15, start[i]:end[i]] / (VVB[i]*BP/1000);  // divide by subject's blood volume VVB
   }
   cHatObs = cHat[iObs];
 }
@@ -330,7 +330,7 @@ generated quantities{
                                               ss[start[i]:end[i]],
                                               KPred, biovar, tlag);
 
-    cHatPred[start[i]:end[i]] = xPred[15, start[i]:end[i]] / VVB[i];
+    cHatPred[start[i]:end[i]] = xPred[15, start[i]:end[i]] / (VVB[i]*BP/1000);
   }
 
    // predictions for observed data records

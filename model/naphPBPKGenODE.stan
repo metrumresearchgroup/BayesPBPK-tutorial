@@ -1,11 +1,11 @@
 functions{
   real[] PBPKModelODE(real t, real[] x, real[] parms, real[] rdummy, int[] idummy){
     real dxdt[18];
-    real EXPOSURE = rdummy[2];
+    real EXPO = rdummy[1];
     
     // Skin exposure parameters.
-    AEXP = 20.0;         // Area of exposed skin (cm^2).
-    VWELL = 1.0;        // Volume of material in exposure well (mL).
+    real AEXP = 20.0;         // Area of exposed skin (cm^2).
+    real VWELL = 1.0;        // Volume of material in exposure well (mL).
     
     // Basic anatomical and physiological parameters.
     real BW = 63.5 * 1000;   // Body mass (g).
@@ -16,6 +16,12 @@ functions{
     real TSC = 0.003;    // Thickness of stratum corneum (cm).
     real TVE = 0.0075;   // Thickness of viable epidermis (cm).
     
+    // Blood flows (as fractions of cardiac output) to ...
+    real FBLI = 0.25;        // ... liver.
+    real FBFA = 0.07;        // ... fat.
+    real FBPP = 0.1675;      // ... poorly perfused tissue.
+    real FBRP = 0.5;         // ... richly perfused tissue.
+    
     // Volumes (as fractions of body mass) for ...
     real FTLI = 0.026;       // ... liver.
     real FFAT = 0.136;       // ... fat.
@@ -24,7 +30,7 @@ functions{
     real FTABD = 0.022;      // ... arterial blood.
     real FTVBD = 0.045;      // ... venous blood.
     real FTREM = 0.09;       // ... remaining tissue.
-    real FTPU = 0.0052      // ... pulmonary tissue
+    real FTPU = 0.0052;      // ... pulmonary tissue
     
     // Partition coefficients for ...
     real HBA = 571.0;        // ... blood:air.
@@ -49,7 +55,7 @@ functions{
     real VFAT = FFAT * BW;           // ... fat tissue.
     real VTSC = AEXP * TSC;              // ... (exposed) stratum corneum.
     real VTVE = AEXP * TVE;              // ... (exposed) viable epidermis.
-    real VTRP = FTRP * BW - VTVE + VUR;    // ... richly perfused tissue.
+    real VTRP = FTRP * BW - VTVE;    // ... richly perfused tissue.
     real VTPP = FTPP * BW;           // ... poorly perfused tissue.
     real VTAB = FTABD * BW;          // ... arterial blood.
     real VTVB = FTVBD * BW;          // ... venous blood.
@@ -112,8 +118,8 @@ functions{
     real CVB = AVB / VTVB;           // ... venous blood.
     real CVE = VTVE > 0 ? AVE / VTVE : 0.0;           // ... viable epidermis.
     real CvVE = CVE / HVEB;          // ... veins leaving viable epidermis.
-    real CWELL = (AWELL / VWELL) * EXPOSURE;     // ... skin exposure well.
-    real CSC00 = (CWELL * HSCJP8) * EXPOSURE + CSC01*(1 - EXPOSURE);  // ... outer surface of SC.
+    real CWELL = (AWELL / VWELL) * EXPO;     // ... skin exposure well.
+    real CSC00 = (CWELL * HSCJP8) * EXPO + CSC01*(1 - EXPO);  // ... outer surface of SC.
     real CSC10 = CVE * HSCVE;        // ... interface of SC with VE.
     
     // ----- Metabolism -----
@@ -162,6 +168,7 @@ data{
   int<lower = 0> ss[nt];
   real rate[nt];
   vector<lower = 0>[nObs] cObs;
+  real<lower = 0> exposure[nt];
 }
 
 transformed data{
@@ -170,11 +177,18 @@ transformed data{
   int nCmt = 18;  // number of compartments
   real biovar[nCmt];
   real tlag[nCmt];
-  real VTVB;
+  real VTVB = 0.045 * 63.5 * 1000;  // venous blood volume mL
+  real<lower = 0> EXPO[nt, 1]; 
+  int<lower = 0> idummy[nt, 1];
   
   for (i in 1:nCmt) {
     biovar[i] = 1;
     tlag[i] = 0;
+  }
+  
+  for (i in 1:nt) {
+    EXPO[i, 1] = exposure[i]; 
+    idummy[i, 1] = 0;
   }
 }
 
@@ -197,7 +211,7 @@ transformed parameters{
 
   x = pmx_solve_rk45(PBPKModelODE, nCmt,
                      time, amt, rate, ii, evid, cmt, addl, ss,
-                     parms, biovar, tlag,
+                     parms, biovar, tlag, EXPO, idummy,
                      1e-6, 1e-6, 1e6);
                 
   cHat = x[18] / VTVB;  // divide by subject's blood volume VTVB
@@ -227,10 +241,10 @@ generated quantities{
   parmsPred[1] = HSCJP8;
   parmsPred[2] = NDSC; 
 
-  xPred = pmx_solve_group_rk45(PBPKModelODE, nCmt, len,
-                               time, amt, rate, ii, evid, cmt, addl, ss,
-                               parmsPred, biovar, tlag, WT, idummy,
-                               1e-6, 1e-6, 1e6);
+  xPred = pmx_solve_rk45(PBPKModelODE, nCmt,
+                         time, amt, rate, ii, evid, cmt, addl, ss,
+                         parmsPred, biovar, tlag, EXPO, idummy,
+                         1e-6, 1e-6, 1e6);
 
   cHatPred = xPred[18] / VTVB;
 
