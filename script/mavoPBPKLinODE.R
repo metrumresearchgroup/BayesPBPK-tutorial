@@ -308,7 +308,7 @@ if(runAnalysis){
   
   plot_ppc_cobsPred <- ppc_ribbon_grouped(y=data[["cObs"]], yrep=cobsPred.rep, x=time[iObs],
                                      group=obsByID) + scale_x_continuous(name="time (h)") +
-    scale_y_continuous(name="Plasma concentration (ng/mL)") + theme(axis.text=element_text(size=10))
+    scale_y_continuous(name="Plasma concentration (ng/mL)", trans = "log10") + theme(axis.text=element_text(size=10))
   
   # ppc summary plot
   # get observed data
@@ -340,13 +340,14 @@ if(runAnalysis){
                                  dv = "pred",
                                  idv = "time",
                                  sim = "sim"),
-                               #bins = c(0, 2, 4, 6, 8, 10, 16, 25),     # specify bin separators manually
+                               bins = c(0, 2, 4, 6, 8, 10, 20, 30, 40, 50),     # specify bin separators manually
                                pi = c(0.1, 0.9),                      # prediction interval simulated data to show
                                ci = c(0.05, 0.95),                      # confidence intervals to show
                                pred_corr = FALSE,                       # perform prediction-correction?
                                show = list(obs_dv = TRUE),              # plot observations?
                                ylab = "Concentration",
-                               xlab = "Time (hrs)")
+                               xlab = "Time (hrs)") +
+    scale_y_continuous(trans = "log10")
   
   # save
   plotFile <- mrggsave(list(plot_ppc_cobsPred, 
