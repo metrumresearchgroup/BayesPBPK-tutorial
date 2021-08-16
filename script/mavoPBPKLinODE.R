@@ -252,6 +252,7 @@ if(runAnalysis){
   # summary
   # fitSumm <- fit$summary()  # this will grab all model outputs
   fitSummParams <- fit$summary(variables = parametersToPlot)
+  write.csv(fitSummParams, file = file.path(tabDir, paste(modelName, "ParameterTable", sep = "-")), quote = F, row.names = F)
   
   # density
   plot_mcmcDensityByChain <- mcmc_dens_overlay(subset.pars, facet_args=list(ncol=4))+facet_text(size=10)+theme(axis.text=element_text(size=10))
@@ -267,17 +268,18 @@ if(runAnalysis){
   
   # history
   draws_array <- fit$draws()
-  plot_mcmcHistory <- mcmc_trace(draws_array, pars = parametersToPlot)
+  plot_mcmcHistory <- mcmc_trace(draws_array, pars = c(parametersToPlot[1:7], "omega[1]"))
   
   # correlation
-  plot_pairs <- mcmc_pairs(draws_array, pars = parametersToPlot, off_diag_args = list(size = 1.5), diag_fun = "dens")
+  plot_pairs <- mcmc_pairs(draws_array, pars = c(parametersToPlot[1:7], "omega[1]"), off_diag_args = list(size = 1.5), diag_fun = "dens")
   
   # save
   plotFile <- mrggsave(list(plot_rhat,
                             plot_neff,
                             plot_mcmcHistory,
                             plot_mcmcDensityByChain,
-                            plot_mcmcDensity),
+                            plot_mcmcDensity,
+                            plot_pairs),
                        scriptName,
                        dir = figDir, stem = paste(modelName, "MCMCDiagnostics", sep = "-"),
                        onefile = TRUE)

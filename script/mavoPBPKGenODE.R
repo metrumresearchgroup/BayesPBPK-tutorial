@@ -231,16 +231,26 @@ if(runAnalysis){
   
   myTheme <- theme(text = element_text(size = 12), axis.text = element_text(size = 12))
   
-  # get fit
+  # get fits
+  # dimRho <- nrow(init()$L)
+  # 
+  # parametersToPlot <- c(parametersToPlot,
+  #                       paste("rho[", matrix(apply(expand.grid(1:dimRho, 1:dimRho),
+  #                                                  1, paste, collapse = ","),
+  #                                            ncol = dimRho)[upper.tri(diag(dimRho),
+  #                                                                     diag = FALSE)], "]",
+  #                             sep = ""))
+  
   parametersToPlot <- setdiff(parametersToPlot, "rho")
   outputFiles <- paste0(file.path(outDir,modelName), sprintf("%01d.csv", 1:nChains))
   fit <- as_cmdstan_fit(outputFiles)
-  subset.pars <- subset_draws(fit$draws(), variable=parametersToPlot[parametersToPlot != "rho"])
+  subset.pars <- subset_draws(fit$draws(), variable=parametersToPlot)
   
   ## diagnostics ##
   # summary
   # fitSumm <- fit$summary()  # this will grab all model outputs
   fitSummParams <- fit$summary(variables = parametersToPlot)
+  write.csv(fitSummParams, file = file.path(tabDir, paste(modelName, "ParameterTable", sep = "-")), quote = F, row.names = F)
   
   # density
   plot_mcmcDensityByChain <- mcmc_dens_overlay(subset.pars, facet_args=list(ncol=4))+facet_text(size=10)+theme(axis.text=element_text(size=10))
@@ -256,17 +266,18 @@ if(runAnalysis){
   
   # history
   draws_array <- fit$draws()
-  plot_mcmcHistory <- mcmc_trace(draws_array, pars = parametersToPlot)
+  plot_mcmcHistory <- mcmc_trace(draws_array, pars = c(parametersToPlot[1:7], "omega[1]"))
   
   # correlation
-  plot_pairs <- mcmc_pairs(draws_array, pars = parametersToPlot, off_diag_args = list(size = 1.5), diag_fun = "dens")
+  plot_pairs <- mcmc_pairs(draws_array, pars = c(parametersToPlot[1:7], "omega[1]"), off_diag_args = list(size = 1.5), diag_fun = "dens")
   
   # save
   plotFile <- mrggsave(list(plot_rhat,
                             plot_neff,
                             plot_mcmcHistory,
                             plot_mcmcDensityByChain,
-                            plot_mcmcDensity),
+                            plot_mcmcDensity,
+                            plot_pairs),
                        scriptName,
                        dir = figDir, stem = paste(modelName, "MCMCDiagnostics", sep = "-"),
                        onefile = TRUE)
@@ -297,7 +308,7 @@ if(runAnalysis){
   
   plot_ppc_cobsPred <- ppc_ribbon_grouped(y=data[["cObs"]], yrep=cobsPred.rep, x=time[iObs],
                                           group=obsByID) + scale_x_continuous(name="time (h)") +
-    scale_y_continuous(name="Plasma concentration (ng/mL)") + theme(axis.text=element_text(size=10))
+    scale_y_continuous(name="Plasma concentration (ng/mL)", trans = "log10") + theme(axis.text=element_text(size=10))
   
   # ppc summary plot
   # get observed data
@@ -329,13 +340,14 @@ if(runAnalysis){
                                   dv = "pred",
                                   idv = "time",
                                   sim = "sim"),
-                                #bins = c(0, 2, 4, 6, 8, 10, 16, 25),     # specify bin separators manually
+                                bins = c(0, 2, 4, 6, 8, 10, 20, 30, 40, 50),     # specify bin separators manually
                                 pi = c(0.1, 0.9),                      # prediction interval simulated data to show
                                 ci = c(0.05, 0.95),                      # confidence intervals to show
                                 pred_corr = FALSE,                       # perform prediction-correction?
                                 show = list(obs_dv = TRUE),              # plot observations?
                                 ylab = "Concentration",
-                                xlab = "Time (hrs)")
+                                xlab = "Time (hrs)") +
+    scale_y_continuous(trans = "log10")
   
   # save
   plotFile <- mrggsave(list(plot_ppc_cobsPred, 
