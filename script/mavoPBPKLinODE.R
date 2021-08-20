@@ -232,16 +232,6 @@ if(runAnalysis){
   
   myTheme <- theme(text = element_text(size = 12), axis.text = element_text(size = 12))
   
-  # get fits
-  # dimRho <- nrow(init()$L)
-  # 
-  # parametersToPlot <- c(parametersToPlot,
-  #                       paste("rho[", matrix(apply(expand.grid(1:dimRho, 1:dimRho),
-  #                                                  1, paste, collapse = ","),
-  #                                            ncol = dimRho)[upper.tri(diag(dimRho),
-  #                                                                     diag = FALSE)], "]",
-  #                             sep = ""))
-  
   parametersToPlot <- setdiff(parametersToPlot, "rho")
   outputFiles <- paste0(file.path(outDir,modelName), sprintf("%01d.csv", 1:nChains))
   fit <- as_cmdstan_fit(outputFiles)
@@ -270,7 +260,7 @@ if(runAnalysis){
   plot_mcmcHistory <- mcmc_trace(draws_array, pars = c(parametersToPlot[1:7], "omega[1]"))
   
   # correlation
-  #plot_pairs <- mcmc_pairs(draws_array, pars = c(parametersToPlot[1:7], "omega[1]"), off_diag_args = list(size = 1.5), diag_fun = "dens")
+  plot_pairs <- mcmc_pairs(draws_array, pars = c(parametersToPlot[1:7], "omega[1]"), off_diag_args = list(size = 1.5), diag_fun = "dens")
   
   # save
   plotFile <- mrggsave(list(plot_rhat,
@@ -336,7 +326,7 @@ if(runAnalysis){
     gather(sim, pred, -ID, -time) %>%
     mutate(sim = as.integer(gsub("V","",sim))) %>%
     select(sim, ID, time, pred) %>%
-    left_join(dat %>% select(ID, ID2, DOSE), by = "ID") %>%
+    left_join(df_cobs %>% select(ID, ID2, DOSE), by = "ID") %>%
     distinct() %>%
     mutate(dnpred = pred/DOSE)
   
@@ -345,7 +335,7 @@ if(runAnalysis){
     gather(sim, pred, -ID, -time) %>%
     mutate(sim = as.integer(gsub("V","",sim))) %>%
     select(sim, ID, time, pred) %>%
-    left_join(dat %>% mutate(ID2 = ID, ID = dense_rank(ID)) %>% select(ID, ID2, DOSE), by = "ID") %>%
+    left_join(df_cobs %>% mutate(ID2 = ID, ID = dense_rank(ID)) %>% select(ID, ID2, DOSE), by = "ID") %>%
     distinct() %>%
     mutate(dnpred = pred/DOSE)
   

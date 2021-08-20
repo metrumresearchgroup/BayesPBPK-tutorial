@@ -230,16 +230,6 @@ if(runAnalysis){
   
   myTheme <- theme(text = element_text(size = 12), axis.text = element_text(size = 12))
   
-  # get fits
-  # dimRho <- nrow(init()$L)
-  # 
-  # parametersToPlot <- c(parametersToPlot,
-  #                       paste("rho[", matrix(apply(expand.grid(1:dimRho, 1:dimRho),
-  #                                                  1, paste, collapse = ","),
-  #                                            ncol = dimRho)[upper.tri(diag(dimRho),
-  #                                                                     diag = FALSE)], "]",
-  #                             sep = ""))
-  
   parametersToPlot <- setdiff(parametersToPlot, "rho")
   outputFiles <- paste0(file.path(outDir,modelName), sprintf("%01d.csv", 1:nChains))
   fit <- as_cmdstan_fit(outputFiles)
@@ -268,7 +258,7 @@ if(runAnalysis){
   plot_mcmcHistory <- mcmc_trace(draws_array, pars = c(parametersToPlot[1:7], "omega[1]"))
   
   # correlation
-  #plot_pairs <- mcmc_pairs(draws_array, pars = c(parametersToPlot[1:7], "omega[1]"), off_diag_args = list(size = 1.5), diag_fun = "dens")
+  plot_pairs <- mcmc_pairs(draws_array, pars = c(parametersToPlot[1:7], "omega[1]"), off_diag_args = list(size = 1.5), diag_fun = "dens")
   
   # save
   plotFile <- mrggsave(list(plot_rhat,
@@ -324,7 +314,9 @@ if(runAnalysis){
   df_cobs <- tibble(ID = obsByID,
                     time = time[iObs],
                     obs = cObs) %>%
-    left_join(dat %>% mutate(ID2 = ID, ID = dense_rank(ID)) %>% select(ID, ID2, DOSE), by = "ID")
+    left_join(dat %>% mutate(ID2 = ID, ID = dense_rank(ID)) %>% select(ID, ID2, DOSE), by = "ID") %>%
+    distinct() %>%
+    mutate(dnobs = obs/DOSE)
   
   # get predictions
   df_cobsCond <- as_tibble(t(cobsCond.rep)) %>%
@@ -332,14 +324,18 @@ if(runAnalysis){
     gather(sim, pred, -ID, -time) %>%
     mutate(sim = as.integer(gsub("V","",sim))) %>%
     select(sim, ID, time, pred) %>%
-    left_join(dat %>% select(ID, ID2, DOSE), by = "ID")
+    left_join(df_cobs %>% select(ID, ID2, DOSE), by = "ID") %>%
+    distinct() %>%
+    mutate(dnpred = pred/DOSE)
   
   df_cobsPred <- as_tibble(t(cobsPred.rep)) %>%
     mutate(ID = obsByID, time = time[iObs]) %>%
     gather(sim, pred, -ID, -time) %>%
     mutate(sim = as.integer(gsub("V","",sim))) %>%
     select(sim, ID, time, pred) %>%
-    left_join(dat %>% mutate(ID2 = ID, ID = dense_rank(ID)) %>% select(ID, ID2, DOSE), by = "ID")
+    left_join(df_cobs %>% mutate(ID2 = ID, ID = dense_rank(ID)) %>% select(ID, ID2, DOSE), by = "ID") %>%
+    distinct() %>%
+    mutate(dnpred = pred/DOSE)
   
   plot_ppc_cobsPred_summ_byDose <- vpc(sim = df_cobsPred,
                                        obs = df_cobs,                               # supply simulation and observation dataframes
@@ -382,9 +378,30 @@ if(runAnalysis){
                                       xlab = "Time (h)") +
     scale_y_continuous(trans = "log10")
   
+  plot_ppc_cobsPred_summ_total_dosenorm <- vpc(sim = df_cobsPred,
+                                               obs = df_cobs,                               # supply simulation and observation dataframes
+                                               obs_cols = list(
+                                                 id = "ID2",
+                                                 dv = "dnobs",                             # these column names are the default,
+                                                 idv = "time"),                         # update these if different.
+                                               sim_cols = list(
+                                                 id = "ID2",
+                                                 dv = "dnpred",
+                                                 idv = "time",
+                                                 sim = "sim"),
+                                               bins = c(0, 2, 4, 6, 8, 10, 20, 30, 40, 50),     # specify bin separators manually
+                                               pi = c(0.1, 0.9),                      # prediction interval simulated data to show
+                                               ci = c(0.05, 0.95),                      # confidence intervals to show
+                                               pred_corr = FALSE,                       # perform prediction-correction?
+                                               show = list(obs_dv = TRUE),              # plot observations?
+                                               ylab = "Mavoglurant dose-normalized concentration (ng/mL/mg)",
+                                               xlab = "Time (h)") +
+    scale_y_continuous(trans = "log10")
+  
   # save
   plotFile <- mrggsave(list(plot_ppc_cobsPred, 
                             plot_ppc_cobsPred_summ_total,
+                            plot_ppc_cobsPred_summ_total_dosenorm,
                             plot_ppc_cobsPred_summ_byDose),
                        scriptName,
                        dir = figDir, stem = paste(modelName,"PPC", sep = "-"),
