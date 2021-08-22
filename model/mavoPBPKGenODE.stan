@@ -95,9 +95,9 @@ functions{
     dxdt[11] = QGU*(Arterial_Blood/VAB - Gut/KbGU/VGU);  //gut
     dxdt[12] = QBO*(Arterial_Blood/VAB - Bones/KbBO/VBO);  //bones
     dxdt[13] = QKI*(Arterial_Blood/VAB - Kidneys/KbKI/VKI);  //kidneys
-    dxdt[14] = QLU*(Lungs/KbLU/VLU - Arterial_Blood/VAB);  //lungs
+    dxdt[14] = QLU*(Lungs/KbLU/VLU - Arterial_Blood/VAB);  //arterial blood
     dxdt[15] = QHT*Heart/KbHT/VHT + QBR*Brain/KbBR/VBR + QMU*Muscles/KbMU/VMU + QAD*Adipose/KbAD/VAD + QSK*Skin/KbSK/VSK + QLI*Liver/KbLI/VLI + QBO*Bones/KbBO/VBO + QKI*Kidneys/KbKI/VKI + QRB*Rest_of_Body/KbRB/VRB - QLU*Venous_Blood/VVB;  //venous_blood
-    dxdt[16] = QRB*(Arterial_Blood/VAB - Rest_of_Body/KbRB/VRB);  //arterial blood
+    dxdt[16] = QRB*(Arterial_Blood/VAB - Rest_of_Body/KbRB/VRB);  //rest of body
 
     return dxdt;
   }
