@@ -137,7 +137,7 @@ init <- function(){
        omega = exp(rnorm(nIIV, log(0.25), 0.25)),
        L = diag(nIIV),
        sigma = runif(1, 0.25, 1),
-       eta = matrix(rep(0, nIIV * nSubject), nrow = nIIV))
+       etaStd = matrix(rep(0, nIIV * nSubject), nrow = nIIV))
 }
 
 ## Specify the variables for which you want history and density plots
@@ -146,7 +146,7 @@ parametersToPlot <- c("CLintHat", "KbBR", "KbMU", "KbAD", "KbBO", "KbRB",
 
 ## Additional variables to monitor
 otherRVs <- c("cObsCond", "cObsPred", 
-              "cHat", "eta")
+              "cHat")
 
 parameters <- c(parametersToPlot, otherRVs)
 
