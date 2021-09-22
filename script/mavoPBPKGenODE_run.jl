@@ -4,6 +4,7 @@ using CSV, DataFrames, Random
 using OrdinaryDiffEq, DiffEqCallbacks, Turing, Distributions
 using Plots, StatsPlots, MCMCChains
 using Gadfly
+using JLD
 
 Random.seed!(123)
 
@@ -95,12 +96,12 @@ mod = fitPBPK(dat_obs.DV, prob, nSubject, rates, times, wts, cbs, VVBs, BP)
 # run 
 ## serial 
 @time chains = mapreduce(c -> sample(mod, NUTS(250,.8), 250), chainscat, 1:4)  # serial
-@time chains_prior = mapreduce(c -> sample(mod, Prior(), 250), chainscat, 1:4)  # serial
+#@time chains_prior = mapreduce(c -> sample(mod, Prior(), 250), chainscat, 1:4)  # serial
 
 ## multithreading
-@time chains = sample(mod, NUTS(250,.8), MCMCThreads(), 250, 4)  # parallel
-@time chains_prior = sample(mod, Prior(), MCMCThreads(), 250, 4)  # parallel
-@time chains = mapreduce(c -> sample(mod, NUTS(5,.8), 5), chainscat, 1:4)  # serial
+#@time chains = sample(mod, NUTS(250,.8), MCMCThreads(), 250, 4)  # parallel
+#@time chains_prior = sample(mod, Prior(), MCMCThreads(), 250, 4)  # parallel
+
 ## save chains
 save("model/mavoPBPKGenODEchains.jld","chains",chains)
 
