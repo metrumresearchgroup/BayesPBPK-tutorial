@@ -12,7 +12,7 @@ function PBPKODE!(du, u, p, t)
     k₀ = p[8];
 
     # Regional blood flows
-    CO  = (187.00*WT^0.81)*60/1000;         # Cardiac output (L/h) from White et al (1968)
+    CO  = (187.0*WT^0.81)*60/1000;         # Cardiac output (L/h) from White et al (1968)
     QHT = 4.0 *CO/100;
     QBR = 12.0*CO/100;
     QMU = 17.0*CO/100;
@@ -33,7 +33,7 @@ function PBPKODE!(du, u, p, t)
     VLU = (0.76 *WT/100)/1.051;
     VHT = (0.47 *WT/100)/1.030;
     VBR = (2.00 *WT/100)/1.036;
-    VMU = (40.00*WT/100)/1.041;
+    VMU = (40.0*WT/100)/1.041;
     VAD = (21.42*WT/100)/0.916;
     VSK = (3.71 *WT/100)/1.116;
     VSP = (0.26 *WT/100)/1.054;
