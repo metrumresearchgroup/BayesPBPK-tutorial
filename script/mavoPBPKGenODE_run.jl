@@ -6,7 +6,7 @@ using Plots, StatsPlots, MCMCChains
 using Gadfly
 using JLD
 
-Random.seed!(123)
+Random.seed!(1234)
 
 # read data
 dat = CSV.read("data/Mavoglurant_A2121_nmpk.csv", DataFrame)
@@ -95,26 +95,26 @@ mod = fitPBPK(dat_obs.DV, prob, nSubject, rates, times, wts, cbs, VVBs, BP)
 
 # run 
 ## serial 
-@time chains = mapreduce(c -> sample(mod, NUTS(250,.8), 250), chainscat, 1:4)  # serial
-#@time chains_prior = mapreduce(c -> sample(mod, Prior(), 250), chainscat, 1:4)  # serial
+@time mcmcchains = mapreduce(c -> sample(mod, NUTS(250,.8), 250), chainscat, 1:4)  # serial
+#@time mcmcchains_prior = mapreduce(c -> sample(mod, Prior(), 250), chainscat, 1:4)  # serial
 
 ## multithreading
-#@time chains = sample(mod, NUTS(250,.8), MCMCThreads(), 250, 4)  # parallel
-#@time chains_prior = sample(mod, Prior(), MCMCThreads(), 250, 4)  # parallel
+@time mcmcchains = sample(mod, NUTS(250,.8), MCMCThreads(), 250, 4)  # parallel
+#@time mcmcchains_prior = sample(mod, Prior(), MCMCThreads(), 250, 4)  # parallel
 
-## save chains
-save("model/mavoPBPKGenODEchains.jld","chains",chains)
+## save mcmcchains
+save("model/mavoPBPKGenODEchains.jld","mcmcchains",mcmcchains)
 
 ## diagnostics
-summ, quant = describe(chains)
-plot_chains = StatsPlots.plot(chains)  # chains[samples, params, chains]
-#savefig(plot_chains, "BayesPopChains.pdf")
+summ, quant = describe(mcmcchains)
+plot_chains = StatsPlots.plot(mcmcchains)  # mcmcchains[samples, params, chains]
+#savefig(plot_mcmcchains, "BayesPopChains.pdf")
 
 ## predictive checks
 dat_missing = Vector{Missing}(missing, length(dat_obs.DV)) # vector of `missing`
 mod_pred = fitPBPK(dat_missing, prob, nSubject, rates, times, wts, cbs, VVBs, BP)
-pred = predict(mod_pred, chains)  # posterior
-pred_prior = predict(mod_pred, chains_prior)
+pred = predict(mod_pred, mcmcchains)  # posterior
+pred_prior = predict(mod_pred, mcmcchains_prior)
 
 ### predictive checks summaries
 summarystats(pred)
@@ -131,9 +131,9 @@ plot_posteriorcheck = Gadfly.plot(x=dat_obs.TIME, y=dat_obs.DV, Geom.point, Them
     layer(x=dat_obs.TIME, y=quant_pred[:,4], Geom.line),
     layer(x=dat_obs.TIME, ymin=quant_pred[:,2], ymax=quant_pred[:,6], Geom.ribbon))
 
-plot_priorcheck = Gadfly.plot(x=data_obs.TIME, y=data_obs.DV, Geom.point, Theme(background_color = "white"), Guide.xlabel("Time"), Guide.ylabel("Concentration"), Guide.title("Prior predictive check"),
-    layer(x=data_obs.TIME, y=quant_pred_prior[:,4], Geom.line),
-    layer(x=data_obs.TIME, ymin=quant_pred_prior[:,2], ymax=quant_pred_prior[:,6], Geom.ribbon))
+plot_priorcheck = Gadfly.plot(x=dat_obs.TIME, y=dat_obs.DV, Geom.point, Theme(background_color = "white"), Guide.xlabel("Time"), Guide.ylabel("Concentration"), Guide.title("Prior predictive check"),
+    layer(x=dat_obs.TIME, y=quant_pred_prior[:,4], Geom.line),
+    layer(x=dat_obs.TIME, ymin=quant_pred_prior[:,2], ymax=quant_pred_prior[:,6], Geom.ribbon))
 
 hstack(plot_priorcheck, plot_posteriorcheck)
 
