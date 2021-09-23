@@ -4,7 +4,6 @@ using CSV, DataFrames, Random
 using OrdinaryDiffEq, DiffEqCallbacks, Turing, Distributions
 using Plots, StatsPlots, MCMCChains
 using Gadfly
-using JLD
 
 Random.seed!(1234)
 
@@ -103,12 +102,15 @@ mod = fitPBPK(dat_obs.DV, prob, nSubject, rates, times, wts, cbs, VVBs, BP)
 #@time mcmcchains_prior = sample(mod, Prior(), MCMCThreads(), 250, 4)  # parallel
 
 ## save mcmcchains
-save("model/mavoPBPKGenODEchains.jld","mcmcchains",mcmcchains)
+#write("model/mavoPBPKGenODEchains.jls",mcmcchains)
+
+##load saved chains
+#mcmcchains = read("model/mavoPBPKGenODEchains.jls", Chains)
 
 ## diagnostics
 summ, quant = describe(mcmcchains)
 plot_chains = StatsPlots.plot(mcmcchains)  # mcmcchains[samples, params, chains]
-#savefig(plot_mcmcchains, "BayesPopChains.pdf")
+#savefig(plot_chains, "BayesPopChains.pdf")
 
 ## predictive checks
 dat_missing = Vector{Missing}(missing, length(dat_obs.DV)) # vector of `missing`
