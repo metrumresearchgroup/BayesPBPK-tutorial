@@ -52,6 +52,8 @@ library(parallel)
 library(future.apply)
 library(cmdstanr)
 library(posterior)
+library(vpc)
+library(mrggsave)
 
 source(file.path(toolsDir, "stanTools.R"))
 source(file.path(toolsDir, "functions.R"))
