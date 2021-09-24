@@ -153,7 +153,7 @@ summ_pred, quant_pred = describe(pred)
 #CSV.write(joinpath(tabPath, "Quantiles_PPC.csv"), quant_pred)
 
 # data assembly
-bins = [0, 2, 4, 6, 8, 10, 20, 30, 40, 50]
+bins = [0, 1, 2, 3, 4, 6, 8, 10, 20, 30, 40, 50]
 labels = string.(1:length(bins) - 1)
 
 ## observed
