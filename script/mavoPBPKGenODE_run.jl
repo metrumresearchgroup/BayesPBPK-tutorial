@@ -7,13 +7,21 @@ using Gadfly
 
 Random.seed!(1234)
 
+# paths
+modDir = "model"
+modName = "mavoPBPKGenODE"
+tabDir = joinpath("deliv","table")
+figDir = joinpath("deliv","figure")
+figPath = mkpath(joinpath(figDir, string(modName, "_jl")))
+tabPath = mkpath(joinpath(tabDir, string(modName, "_jl")))
+
 # read data
 dat = CSV.read("data/Mavoglurant_A2121_nmpk.csv", DataFrame)
 dat = dat[dat.ID .<= 812,:]
 dat_obs = dat[dat.MDV .== 0,:]  # grab first 20 subjects ; remove missing obs
 
 # load model
-include("model/mavoPBPKGenODE.jl")
+include(joinpath(modDir, string(modName, ".jl")))
 
 # conditions
 nSubject = length(unique(dat.ID))
@@ -102,40 +110,113 @@ mod = fitPBPK(dat_obs.DV, prob, nSubject, rates, times, wts, cbs, VVBs, BP)
 #@time mcmcchains_prior = sample(mod, Prior(), MCMCThreads(), 250, 4)  # parallel
 
 ## save mcmcchains
-#write("model/mavoPBPKGenODEchains.jls",mcmcchains)
+#write(joinpath(modDir, string(modName, "chains.jls")), mcmcchains)
 
 ##load saved chains
-#mcmcchains = read("model/mavoPBPKGenODEchains.jls", Chains)
+#mcmcchains = read(joinpath(modDir, string(modName, "chains.jls")), Chains)
 
-## diagnostics
+
+#---# diagnostics #---#
+# tables
 summ, quant = describe(mcmcchains)
-plot_chains = StatsPlots.plot(mcmcchains)  # mcmcchains[samples, params, chains]
-#savefig(plot_chains, "BayesPopChains.pdf")
 
-## predictive checks
+## summary
+df_summ = DataFrame(summ)
+CSV.write(joinpath(tabPath, "Summary.csv"), df_summ)
+
+## quantiles
+df_quant = DataFrame(quant)
+CSV.write(joinpath(tabPath, "Quantiles.csv"), df_quant)
+
+# plots
+## trace plots
+#plot_chains = StatsPlots.plot(mcmcchains[:,1:8,:])  # mcmcchains[samples, params, chains]
+plot_chains1 = StatsPlots.plot(mcmcchains[:,1:4,:])
+plot_chains2 = StatsPlots.plot(mcmcchains[:,5:8,:])
+plot_chains = Plots.plot(plot_chains1, plot_chains2, layout = (1,2))
+savefig(plot_chains, joinpath(figPath, "MCMCTrace.pdf"))
+
+#---# predictive checks #---#
 dat_missing = Vector{Missing}(missing, length(dat_obs.DV)) # vector of `missing`
 mod_pred = fitPBPK(dat_missing, prob, nSubject, rates, times, wts, cbs, VVBs, BP)
 pred = predict(mod_pred, mcmcchains)  # posterior
-pred_prior = predict(mod_pred, mcmcchains_prior)
+#pred_prior = predict(mod_pred, mcmcchains_prior)
 
 ### predictive checks summaries
-summarystats(pred)
+#summarystats(pred)
 summ_pred, quant_pred = describe(pred)
-summarystats(pred_prior)
-summ_pred_prior, quant_pred_prior = describe(pred_prior)
+#summarystats(pred_prior)
+#summ_pred_prior, quant_pred_prior = describe(pred_prior)
 
 #### save
-#CSV.write("BayesPopSumm.csv", summ)
-#CSV.write("BayesPopQuant.csv", quant)
+#CSV.write(joinpath(tabPath, "Summary_PPC.csv"), summ_pred)
+#CSV.write(joinpath(tabPath, "Quantiles_PPC.csv"), quant_pred)
+
+# data assembly
+bins = [0, 2, 4, 6, 8, 10, 20, 30, 40, 50]
+labels = string.(1:length(bins) - 1)
+
+## observed
+dat_obs_vpc1 = DataFrame(ID = dat_obs.ID, TIME = dat_obs.TIME, DV = dat_obs.DV, DOSE = dat_obs.DOSE)
+dat_obs_vpc2 = transform(dat_obs_vpc1, [:DV, :DOSE] => ByRow((x,y) -> x/y) => :DNDV)
+dat_obs_vpc2.bins = cut(dat_obs_vpc2.TIME, bins, labels=labels)
+
+dat_obs_vpc3 = transform(groupby(dat_obs_vpc2, :bins), :DNDV => x -> quantile(x, 0.05))
+rename!(dat_obs_vpc3, :DNDV_function => :lo)
+dat_obs_vpc3 = transform(groupby(dat_obs_vpc3, :bins), :DNDV => x -> quantile(x, 0.5))
+rename!(dat_obs_vpc3, :DNDV_function => :med)
+dat_obs_vpc3 = transform(groupby(dat_obs_vpc3, :bins), :DNDV => x -> quantile(x, 0.95))
+rename!(dat_obs_vpc3, :DNDV_function => :hi)
+
+## predicted
+df_pred1 = DataFrame(pred)
+df_pred2 = DataFrames.stack(df_pred1, 3:270)
+sort!(df_pred2, [:iteration,:chain])
+dat_obs_rep = select(repeat(dat_obs, 1000), [:ID,:TIME,:DOSE])
+df_pred3 = hcat(dat_obs_rep, df_pred2)
+df_pred4 = transform(df_pred3, [:value, :DOSE] => ByRow((x,y) -> x/y) => :DNDV)
+df_pred4.bins = cut(df_pred4.TIME, bins, labels=labels)
+
+df_pred5 = transform(groupby(df_pred4, [:iteration,:bins]), :DNDV => x -> quantile(x, 0.05))
+rename!(df_pred5, :DNDV_function => :lo)
+df_pred5 = transform(groupby(df_pred5, [:iteration,:bins]), :DNDV => x -> quantile(x, 0.5))
+rename!(df_pred5, :DNDV_function => :med)
+df_pred5 = transform(groupby(df_pred5, [:iteration,:bins]), :DNDV => x -> quantile(x, 0.95))
+rename!(df_pred5, :DNDV_function => :hi)
+
+df_pred5 = transform(groupby(df_pred5, [:bins]), :lo => x -> quantile(x, 0.05))
+rename!(df_pred5, :lo_function => :loLo)
+df_pred5 = transform(groupby(df_pred5, [:bins]), :lo => x -> quantile(x, 0.5))
+rename!(df_pred5, :lo_function => :medLo)
+df_pred5 = transform(groupby(df_pred5, [:bins]), :lo => x -> quantile(x, 0.95))
+rename!(df_pred5, :lo_function => :hiLo)
+
+df_pred5 = transform(groupby(df_pred5, [:bins]), :med => x -> quantile(x, 0.05))
+rename!(df_pred5, :med_function => :loMed)
+df_pred5 = transform(groupby(df_pred5, [:bins]), :med => x -> quantile(x, 0.5))
+rename!(df_pred5, :med_function => :medMed)
+df_pred5 = transform(groupby(df_pred5, [:bins]), :med => x -> quantile(x, 0.95))
+rename!(df_pred5, :med_function => :hiMed)
+
+df_pred5 = transform(groupby(df_pred5, [:bins]), :hi => x -> quantile(x, 0.05))
+rename!(df_pred5, :hi_function => :loHi)
+df_pred5 = transform(groupby(df_pred5, [:bins]), :hi => x -> quantile(x, 0.5))
+rename!(df_pred5, :hi_function => :medHi)
+df_pred5 = transform(groupby(df_pred5, [:bins]), :hi => x -> quantile(x, 0.95))
+rename!(df_pred5, :hi_function => :hiHi)
+
+df_pred6 = subset(df_pred5, :iteration => ByRow(==(1)), :chain => ByRow(==(1)))
 
 ### plot
-plot_posteriorcheck = Gadfly.plot(x=dat_obs.TIME, y=dat_obs.DV, Geom.point, Theme(background_color = "white"), Guide.xlabel("Time"), Guide.ylabel("Concentration"), Guide.title("Posterior predictive check"),
-    layer(x=dat_obs.TIME, y=quant_pred[:,4], Geom.line),
-    layer(x=dat_obs.TIME, ymin=quant_pred[:,2], ymax=quant_pred[:,6], Geom.ribbon))
-
-plot_priorcheck = Gadfly.plot(x=dat_obs.TIME, y=dat_obs.DV, Geom.point, Theme(background_color = "white"), Guide.xlabel("Time"), Guide.ylabel("Concentration"), Guide.title("Prior predictive check"),
-    layer(x=dat_obs.TIME, y=quant_pred_prior[:,4], Geom.line),
-    layer(x=dat_obs.TIME, ymin=quant_pred_prior[:,2], ymax=quant_pred_prior[:,6], Geom.ribbon))
-
-hstack(plot_priorcheck, plot_posteriorcheck)
+set_default_plot_size(17cm, 12cm)
+plot_posteriorcheck = Gadfly.plot(x=dat_obs_vpc3.TIME, y=dat_obs_vpc3.DNDV, Geom.point, Scale.y_log10, Theme(background_color = "white"), Guide.xlabel("Time (h)"), Guide.ylabel("Mavoglurant dose-normalized concentration (ng/mL/mg)", orientation=:vertical),
+    layer(x=dat_obs_vpc3.TIME, y=dat_obs_vpc3.med, Geom.line),
+    layer(x=dat_obs_vpc3.TIME, y=dat_obs_vpc3.lo, Geom.line),
+    layer(x=dat_obs_vpc3.TIME, y=dat_obs_vpc3.hi, Geom.line),
+    layer(x=df_pred6.TIME, ymin=df_pred6.loLo, ymax=df_pred6.hiLo, Geom.ribbon),
+    layer(x=df_pred6.TIME, ymin=df_pred6.loMed, ymax=df_pred6.hiMed, Geom.ribbon),
+    layer(x=df_pred6.TIME, ymin=df_pred6.loHi, ymax=df_pred6.hiHi, Geom.ribbon))
+    
+p = PDF(joinpath(figPath, "PPC.pdf"), 17cm, 12cm)
+draw(p, plot_posteriorcheck)
 
