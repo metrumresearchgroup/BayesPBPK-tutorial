@@ -144,6 +144,12 @@ git-tree-sha1 = "3a877c2fc5c9b88ed7259fd0bdb7691aad6b50dc"
 uuid = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 version = "0.9.4"
 
+[[Cairo]]
+deps = ["Cairo_jll", "Colors", "Glib_jll", "Graphics", "Libdl", "Pango_jll"]
+git-tree-sha1 = "d0b3f8b4ad16cb0a2988c6788646a5e6a17b6b1b"
+uuid = "159f3aea-2a34-519c-b102-8c37f9878175"
+version = "1.0.5"
+
 [[Cairo_jll]]
 deps = ["Artifacts", "Bzip2_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "JLLWrappers", "LZO_jll", "Libdl", "Pixman_jll", "Pkg", "Xorg_libXext_jll", "Xorg_libXrender_jll", "Zlib_jll", "libpng_jll"]
 git-tree-sha1 = "f2202b55d816427cd385a9a4f3ffb226bee80f99"
@@ -456,6 +462,12 @@ git-tree-sha1 = "335bfdceacc84c5cdf16aadc768aa5ddfc5383cc"
 uuid = "53c48c17-4a7d-5ca2-90c5-79b7896eea93"
 version = "0.8.4"
 
+[[Fontconfig]]
+deps = ["Fontconfig_jll", "Libdl", "Printf"]
+git-tree-sha1 = "beef89322ccf3b80062f522ed6f82089a254491e"
+uuid = "186bb1d3-e1f7-5a2c-a377-96d770f13627"
+version = "0.4.0"
+
 [[Fontconfig_jll]]
 deps = ["Artifacts", "Bzip2_jll", "Expat_jll", "FreeType2_jll", "JLLWrappers", "Libdl", "Libuuid_jll", "Pkg", "Zlib_jll"]
 git-tree-sha1 = "21efd19106a55620a188615da6d3d06cd7f6ee03"
@@ -541,6 +553,12 @@ deps = ["Artifacts", "Gettext_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Libic
 git-tree-sha1 = "7bf67e9a481712b3dbe9cb3dac852dc4b1162e02"
 uuid = "7746bdde-850d-59dc-9ae8-88ece973131d"
 version = "2.68.3+0"
+
+[[Graphics]]
+deps = ["Colors", "LinearAlgebra", "NaNMath"]
+git-tree-sha1 = "2c1cf4df419938ece72de17f368a021ee162762e"
+uuid = "a2bd30eb-e257-5431-a919-1863eab51364"
+version = "1.1.0"
 
 [[Graphite2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -718,9 +736,9 @@ version = "1.2.1"
 
 [[LabelledArrays]]
 deps = ["ArrayInterface", "LinearAlgebra", "MacroTools", "StaticArrays"]
-git-tree-sha1 = "bdde43e002847c34c206735b1cf860bc3abd35e7"
+git-tree-sha1 = "8f5fd068dfee92655b79e0859ecad8b492dfe8b1"
 uuid = "2ee39098-c373-598a-b85f-a56591580800"
-version = "1.6.4"
+version = "1.6.5"
 
 [[Latexify]]
 deps = ["Formatting", "InteractiveUtils", "LaTeXStrings", "MacroTools", "Markdown", "Printf", "Requires"]
@@ -1062,6 +1080,12 @@ deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
 git-tree-sha1 = "4dd403333bcf0909341cfe57ec115152f937d7d8"
 uuid = "90014a1f-27ba-587c-ab20-58faa44d9150"
 version = "0.11.1"
+
+[[Pango_jll]]
+deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "FriBidi_jll", "Glib_jll", "HarfBuzz_jll", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "9bc1871464b12ed19297fbc56c4fb4ba84988b0d"
+uuid = "36c8627f-9965-5494-a995-c6b170f724f3"
+version = "1.47.0+0"
 
 [[Parameters]]
 deps = ["OrderedCollections", "UnPack"]

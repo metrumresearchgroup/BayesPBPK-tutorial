@@ -352,8 +352,8 @@ if(runAnalysis){
                                  sim = "sim"),
                                stratify = "DOSE",
                                bins = c(0, 2, 4, 6, 8, 10, 20, 30, 40, 50),     # specify bin separators manually
-                               pi = c(0.1, 0.9),                      # prediction interval simulated data to show
-                               ci = c(0.05, 0.95),                      # confidence intervals to show
+                               pi = c(0.05, 0.95),                      # prediction interval simulated data to show
+                               ci = c(0.025, 0.975),                      # confidence intervals to show
                                pred_corr = FALSE,                       # perform prediction-correction?
                                show = list(obs_dv = TRUE),              # plot observations?
                                ylab = "Mavoglurant concentration (ng/mL)",
@@ -372,8 +372,8 @@ if(runAnalysis){
                                          idv = "time",
                                          sim = "sim"),
                                        bins = c(0, 2, 4, 6, 8, 10, 20, 30, 40, 50),     # specify bin separators manually
-                                       pi = c(0.1, 0.9),                      # prediction interval simulated data to show
-                                       ci = c(0.05, 0.95),                      # confidence intervals to show
+                                       pi = c(0.05, 0.95),                      # prediction interval simulated data to show
+                                       ci = c(0.025, 0.975),                      # confidence intervals to show
                                        pred_corr = FALSE,                       # perform prediction-correction?
                                        show = list(obs_dv = TRUE),              # plot observations?
                                        ylab = "Mavoglurant concentration (ng/mL)",
@@ -392,8 +392,8 @@ if(runAnalysis){
                                         idv = "time",
                                         sim = "sim"),
                                       bins = c(0, 2, 4, 6, 8, 10, 20, 30, 40, 50),     # specify bin separators manually
-                                      pi = c(0.1, 0.9),                      # prediction interval simulated data to show
-                                      ci = c(0.05, 0.95),                      # confidence intervals to show
+                                      pi = c(0.05, 0.95),                      # prediction interval simulated data to show
+                                      ci = c(0.025, 0.975),                      # confidence intervals to show
                                       pred_corr = FALSE,                       # perform prediction-correction?
                                       show = list(obs_dv = TRUE),              # plot observations?
                                       ylab = "Mavoglurant dose-normalized concentration (ng/mL/mg)",
