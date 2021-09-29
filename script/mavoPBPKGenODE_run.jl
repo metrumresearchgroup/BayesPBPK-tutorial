@@ -1,7 +1,7 @@
 cd(@__DIR__)
 using Pkg; Pkg.activate(".")
 using CSV, DataFrames, Random
-using OrdinaryDiffEq, DiffEqCallbacks, Turing, Distributions
+using OrdinaryDiffEq, DiffEqCallbacks, Turing, Distributions, CategoricalArrays
 using Plots, StatsPlots, MCMCChains
 using Gadfly
 
@@ -139,7 +139,8 @@ savefig(plot_chains, joinpath(figPath, "MCMCTrace.pdf"))
 #---# predictive checks #---#
 dat_missing = Vector{Missing}(missing, length(dat_obs.DV)) # vector of `missing`
 mod_pred = fitPBPK(dat_missing, prob, nSubject, rates, times, wts, cbs, VVBs, BP)
-pred = predict(mod_pred, mcmcchains)  # posterior
+pred = predict(mod_pred, mcmcchains)  # posterior ; conditioned on each sample in chains
+pred = predict(mod_pred, mcmcchains, include_all=false)
 #pred_prior = predict(mod_pred, mcmcchains_prior)
 
 ### predictive checks summaries
