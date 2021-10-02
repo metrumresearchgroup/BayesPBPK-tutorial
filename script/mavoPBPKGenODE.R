@@ -339,7 +339,7 @@ if(runAnalysis){
     distinct() %>%
     mutate(dnpred = pred/DOSE)
   
-  plot_ppc_cobsPred_summ_byDose <- vpc(sim = df_cobsPred,
+  plot_ppc_cobsPred_summ_byDose <- vpc(sim = df_cobsCond,
                                        obs = df_cobs,                               # supply simulation and observation dataframes
                                        obs_cols = list(
                                          id = "ID2",
@@ -360,7 +360,7 @@ if(runAnalysis){
                                        xlab = "Time (h)") +
     scale_y_continuous(trans = "log10")
   
-  plot_ppc_cobsPred_summ_total <- vpc(sim = df_cobsPred,
+  plot_ppc_cobsPred_summ_total <- vpc(sim = df_cobsCond,
                                       obs = df_cobs,                               # supply simulation and observation dataframes
                                       obs_cols = list(
                                         id = "ID2",
@@ -380,7 +380,7 @@ if(runAnalysis){
                                       xlab = "Time (h)") +
     scale_y_continuous(trans = "log10")
   
-  plot_ppc_cobsPred_summ_total_dosenorm <- vpc(sim = df_cobsPred,
+  plot_ppc_cobsPred_summ_total_dosenorm <- vpc(sim = df_cobsCond,
                                                obs = df_cobs,                               # supply simulation and observation dataframes
                                                obs_cols = list(
                                                  id = "ID2",
