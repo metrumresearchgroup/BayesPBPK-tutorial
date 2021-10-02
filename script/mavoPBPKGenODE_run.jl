@@ -1,9 +1,10 @@
 cd(@__DIR__)
 using Pkg; Pkg.activate(".")
-using CSV, DataFrames, Random
+using CSV, DataFramesMeta, Chain, Random
 using OrdinaryDiffEq, DiffEqCallbacks, Turing, Distributions, CategoricalArrays
 using Plots, StatsPlots, MCMCChains
 using Gadfly
+import Cairo, Fontconfig
 
 Random.seed!(1234)
 
@@ -141,7 +142,7 @@ savefig(plot_chains, joinpath(figPath, "MCMCTrace.pdf"))
 dat_missing = Vector{Missing}(missing, length(dat_obs.DV)) # vector of `missing`
 mod_pred = fitPBPK(dat_missing, prob, nSubject, rates, times, wts, cbs, VVBs, BP)
 #pred = predict(mod_pred, mcmcchains)  # posterior ; conditioned on each sample in chains
-pred = predict(mod_pred, mcmcchains, include_all=false)
+pred = predict(mod_pred, mcmcchains, include_all=false)  # include_all = false means sampling new !!
 #pred_prior = predict(mod_pred, mcmcchains_prior)
 
 ### predictive checks summaries
@@ -159,66 +160,71 @@ bins = [0, 1, 2, 3, 4, 6, 8, 10, 20, 30, 40, 50]
 labels = string.(1:length(bins) - 1)
 
 ## observed
-dat_obs_vpc1 = DataFrame(ID = dat_obs.ID, TIME = dat_obs.TIME, DV = dat_obs.DV, DOSE = dat_obs.DOSE)
-dat_obs_vpc2 = transform(dat_obs_vpc1, [:DV, :DOSE] => ByRow((x,y) -> x/y) => :DNDV)
-dat_obs_vpc2.bins = cut(dat_obs_vpc2.TIME, bins, labels=labels)
-
-dat_obs_vpc3 = transform(groupby(dat_obs_vpc2, :bins), :DNDV => x -> quantile(x, 0.05))
-rename!(dat_obs_vpc3, :DNDV_function => :lo)
-dat_obs_vpc3 = transform(groupby(dat_obs_vpc3, :bins), :DNDV => x -> quantile(x, 0.5))
-rename!(dat_obs_vpc3, :DNDV_function => :med)
-dat_obs_vpc3 = transform(groupby(dat_obs_vpc3, :bins), :DNDV => x -> quantile(x, 0.95))
-rename!(dat_obs_vpc3, :DNDV_function => :hi)
+df_vpc_obs = @chain begin
+    dat_obs
+    @select(:ID, :TIME, :DV, :DOSE)
+    @transform(:DNDV = :DV ./ :DOSE,
+               :bins = cut(:TIME, bins, labels = labels))
+    
+    groupby(:bins)
+    @transform(:lo = quantile(:DNDV, 0.05),
+               :med = quantile(:DNDV, 0.5),
+               :hi = quantile(:DNDV, 0.95))
+end
+df_vpc_obs2 = @orderby(unique(@select(df_vpc_obs, :TIME, :bins, :lo, :med, :hi)), :TIME)
 
 ## predicted
-df_pred1 = DataFrame(pred)
-df_pred2 = DataFrames.stack(df_pred1, 3:270)
-sort!(df_pred2, [:iteration,:chain])
-dat_obs_rep = select(repeat(dat_obs, 1000), [:ID,:TIME,:DOSE])
-df_pred3 = hcat(dat_obs_rep, df_pred2)
-df_pred4 = transform(df_pred3, [:value, :DOSE] => ByRow((x,y) -> x/y) => :DNDV)
-df_pred4.bins = cut(df_pred4.TIME, bins, labels=labels)
+df_pred = DataFrame(pred)
+df_vpc_pred = @chain begin
+    df_pred
+    DataFramesMeta.stack(3:ncol(df_pred))
+    @orderby(:iteration, :chain)
+    hcat(select(repeat(dat_obs, 1000), [:ID,:TIME,:DOSE]))
+    @transform(:DNDV = :value ./ :DOSE,
+    :bins = cut(:TIME, bins, labels = labels))
 
-df_pred5 = transform(groupby(df_pred4, [:iteration,:bins]), :DNDV => x -> quantile(x, 0.05))
-rename!(df_pred5, :DNDV_function => :lo)
-df_pred5 = transform(groupby(df_pred5, [:iteration,:bins]), :DNDV => x -> quantile(x, 0.5))
-rename!(df_pred5, :DNDV_function => :med)
-df_pred5 = transform(groupby(df_pred5, [:iteration,:bins]), :DNDV => x -> quantile(x, 0.95))
-rename!(df_pred5, :DNDV_function => :hi)
+    groupby([:iteration, :chain, :bins])
+    @transform(:lo = quantile(:DNDV, 0.05),
+               :med = quantile(:DNDV, 0.5),
+               :hi = quantile(:DNDV, 0.95))
+    
+    groupby(:bins)
+    @transform(:loLo = quantile(:lo, 0.025),
+               :medLo = quantile(:lo, 0.5),
+               :hiLo = quantile(:lo, 0.975),
+               :loMed = quantile(:med, 0.025),
+               :medMed = quantile(:med, 0.5),
+               :hiMed = quantile(:med, 0.975),
+               :loHi = quantile(:hi, 0.025),
+               :medHi = quantile(:hi, 0.5),
+               :hiHi = quantile(:hi, 0.975))
+end
 
-df_pred5 = transform(groupby(df_pred5, [:bins]), :lo => x -> quantile(x, 0.025))
-rename!(df_pred5, :lo_function => :loLo)
-df_pred5 = transform(groupby(df_pred5, [:bins]), :lo => x -> quantile(x, 0.5))
-rename!(df_pred5, :lo_function => :medLo)
-df_pred5 = transform(groupby(df_pred5, [:bins]), :lo => x -> quantile(x, 0.975))
-rename!(df_pred5, :lo_function => :hiLo)
-
-df_pred5 = transform(groupby(df_pred5, [:bins]), :med => x -> quantile(x, 0.025))
-rename!(df_pred5, :med_function => :loMed)
-df_pred5 = transform(groupby(df_pred5, [:bins]), :med => x -> quantile(x, 0.5))
-rename!(df_pred5, :med_function => :medMed)
-df_pred5 = transform(groupby(df_pred5, [:bins]), :med => x -> quantile(x, 0.975))
-rename!(df_pred5, :med_function => :hiMed)
-
-df_pred5 = transform(groupby(df_pred5, [:bins]), :hi => x -> quantile(x, 0.025))
-rename!(df_pred5, :hi_function => :loHi)
-df_pred5 = transform(groupby(df_pred5, [:bins]), :hi => x -> quantile(x, 0.5))
-rename!(df_pred5, :hi_function => :medHi)
-df_pred5 = transform(groupby(df_pred5, [:bins]), :hi => x -> quantile(x, 0.975))
-rename!(df_pred5, :hi_function => :hiHi)
-
-df_pred6 = subset(df_pred5, :iteration => ByRow(==(1)), :chain => ByRow(==(1)))
+df_vpc_pred2 = @orderby(unique(df_vpc_pred[!,[6;13:21]]), :TIME)
 
 ### plot
+dat_obs2 = @transform(dat_obs, :DNDV = :DV ./ :DOSE)
 set_default_plot_size(17cm, 12cm)
-plot_posteriorcheck = Gadfly.plot(x=dat_obs_vpc3.TIME, y=dat_obs_vpc3.DNDV, Geom.point, Scale.y_log10, Theme(background_color = "white"), Guide.xlabel("Time (h)"), Guide.ylabel("Mavoglurant dose-normalized concentration (ng/mL/mg)", orientation=:vertical),
-    layer(x=dat_obs_vpc3.TIME, y=dat_obs_vpc3.med, Geom.line),
-    layer(x=dat_obs_vpc3.TIME, y=dat_obs_vpc3.lo, Geom.line),
-    layer(x=dat_obs_vpc3.TIME, y=dat_obs_vpc3.hi, Geom.line),
-    layer(x=df_pred6.TIME, ymin=df_pred6.loLo, ymax=df_pred6.hiLo, Geom.ribbon),
-    layer(x=df_pred6.TIME, ymin=df_pred6.loMed, ymax=df_pred6.hiMed, Geom.ribbon),
-    layer(x=df_pred6.TIME, ymin=df_pred6.loHi, ymax=df_pred6.hiHi, Geom.ribbon))
-    
+
+plot_ppc = Gadfly.plot(x=dat_obs2.TIME, y=dat_obs2.DNDV, Geom.point, Scale.y_log10, Theme(background_color = "white"), Guide.xlabel("Time (h)"), Guide.ylabel("Mavoglurant dose-normalized concentration (ng/mL/mg)", orientation=:vertical),
+    layer(x=df_vpc_obs.TIME, y=df_vpc_obs.med, Geom.line),
+    layer(x=df_vpc_obs.TIME, y=df_vpc_obs.lo, Geom.line),
+    layer(x=df_vpc_obs.TIME, y=df_vpc_obs.hi, Geom.line),
+    layer(x=df_vpc_pred2.TIME, ymin=df_vpc_pred2.loLo, ymax=df_vpc_pred2.hiLo, Geom.ribbon),
+    layer(x=df_vpc_pred2.TIME, ymin=df_vpc_pred2.loMed, ymax=df_vpc_pred2.hiMed, Geom.ribbon),
+    layer(x=df_vpc_pred2.TIME, ymin=df_vpc_pred2.loHi, ymax=df_vpc_pred2.hiHi, Geom.ribbon))
+
 p = PDF(joinpath(figPath, "PPC.pdf"), 17cm, 12cm)
-draw(p, plot_posteriorcheck)
+draw(p, plot_ppc)
+
+#=
+plotlyjs()
+plot_ppc = Plots.scatter(dat_obs2.TIME, dat_obs2.DNDV, markeralpha=0.2, color=:black)
+Plots.plot!(df_vpc_obs2.TIME, df_vpc_obs2.lo, linestyle=:dash, color=:black)
+Plots.plot!(df_vpc_obs2.TIME, df_vpc_obs2.med, lty=1, color=:black)
+Plots.plot!(df_vpc_obs2.TIME, df_vpc_obs2.hi, linestyle=:dash, color=:black)
+Plots.plot!(df_vpc_pred2.TIME, df_vpc_pred2.medLo, ribbon=(df_vpc_pred2.loLo, df_vpc_pred2.hiLo), color=:green)
+Plots.plot!(df_vpc_pred2.TIME, df_vpc_pred2.medMed, ribbon=(df_vpc_pred2.loMed, df_vpc_pred2.hiMed), color=:blue)
+Plots.yaxis!(:log10)
+=#
 
