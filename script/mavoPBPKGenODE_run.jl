@@ -242,6 +242,6 @@ plot_ppc = Gadfly.plot(x=dat_obs2.TIME, y=dat_obs2.DNDV, Geom.point, Scale.y_log
     layer(x=df_vpc_pred2.TIME, ymin=df_vpc_pred2.loHi, ymax=df_vpc_pred2.hiHi, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.5]))
 
 plot_tmp = PDF(joinpath(figPath, "PPC.pdf"), 17cm, 12cm)
-draw(pl, plot_ppc)
+draw(plot_tmp, plot_ppc)
 
 
