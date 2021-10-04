@@ -2,6 +2,7 @@ cd(@__DIR__)
 using Pkg; Pkg.activate(".")
 using CSV, DataFramesMeta, Chain, Random
 using OrdinaryDiffEq, DiffEqCallbacks, Turing, Distributions, CategoricalArrays
+using GlobalSensitivity, QuadGK
 using Plots, StatsPlots, MCMCChains
 using Gadfly
 import Cairo, Fontconfig
@@ -59,6 +60,31 @@ p = [CLint, KbBR, KbMU, KbAD, KbBO, KbRB, wts[1], rates[1]]
 
 # define problem
 prob = ODEProblem(PBPKODE!, u0, tspan, p)
+
+## sensitivity analysis ##
+## create function that takes in paramers and returns endpoints for sensitivity
+p_sens = p[1:6]
+f_globsens = function(p_sens)
+    p_all = [p_sens;[94.3,75.0]]
+    tmp_prob = remake(prob, p = p_all)
+    tmp_sol = solve(tmp_prob, Tsit5(), save_idxs=[15])
+    auc, err = quadgk(tmp_sol, 0.0, 48.0)
+    return(auc[1])
+end
+
+### bounds
+bounds = [[1000.0,1500.0],[1.0,10.0],[1.0,10.0],[1.0,10.0],[1.0,10.0],[1.0,10.0]]
+
+#### Sobol
+@time s = GlobalSensitivity.gsa(f_globsens, Sobol(), bounds, N=1000)
+
+pl_sens_total = Plots.bar(["CLint","KbBR","KbMU","KbAD","KbBO","KbRB"], s.ST, title="Total Order Indices", ylabel="Index", legend=false, ylim=(0.0,0.5))
+Plots.hline!([0.05], linestyle=:dash)
+pl_sens_single = Plots.bar(["CLint","KbBR","KbMU","KbAD","KbBO","KbRB"], s.S1, title="First Order Indices", ylabel="Index", legend=false, ylim=(0.0,0.5))
+Plots.hline!([0.05], linestyle=:dash)
+
+pl_sens = Plots.plot(pl_sens_single, pl_sens_total, xrotation = 45)
+savefig(pl_sens, joinpath(figPath, "sensitivity.pdf"))
 
 ## Bayesian inference ##
 @model function fitPBPK(data, prob, nSubject, rates, times, wts, cbs, VVBs, BP) # data should be a Vector
@@ -214,17 +240,7 @@ plot_ppc = Gadfly.plot(x=dat_obs2.TIME, y=dat_obs2.DNDV, Geom.point, Scale.y_log
     layer(x=df_vpc_pred2.TIME, ymin=df_vpc_pred2.loLo, ymax=df_vpc_pred2.hiLo, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.5]),
     layer(x=df_vpc_pred2.TIME, ymin=df_vpc_pred2.loHi, ymax=df_vpc_pred2.hiHi, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.5]))
 
-p = PDF(joinpath(figPath, "PPC.pdf"), 17cm, 12cm)
-draw(p, plot_ppc)
+pl = PDF(joinpath(figPath, "PPC.pdf"), 17cm, 12cm)
+draw(pl, plot_ppc)
 
-#=
-plotlyjs()
-plot_ppc = Plots.scatter(dat_obs2.TIME, dat_obs2.DNDV, markeralpha=0.2, color=:black)
-Plots.plot!(df_vpc_obs2.TIME, df_vpc_obs2.lo, linestyle=:dash, color=:black)
-Plots.plot!(df_vpc_obs2.TIME, df_vpc_obs2.med, lty=1, color=:black)
-Plots.plot!(df_vpc_obs2.TIME, df_vpc_obs2.hi, linestyle=:dash, color=:black)
-Plots.plot!(df_vpc_pred2.TIME, df_vpc_pred2.medLo, ribbon=(df_vpc_pred2.loLo, df_vpc_pred2.hiLo), color=:green)
-Plots.plot!(df_vpc_pred2.TIME, df_vpc_pred2.medMed, ribbon=(df_vpc_pred2.loMed, df_vpc_pred2.hiMed), color=:blue)
-Plots.yaxis!(:log10)
-=#
 
