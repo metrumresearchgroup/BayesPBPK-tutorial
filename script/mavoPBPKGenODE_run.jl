@@ -61,13 +61,15 @@ p = [CLint, KbBR, KbMU, KbAD, KbBO, KbRB, wts[1], rates[1]]
 # define problem
 prob = ODEProblem(PBPKODE!, u0, tspan, p)
 
+########
+
 ## sensitivity analysis ##
 ## create function that takes in paramers and returns endpoints for sensitivity
 p_sens = p[1:6]
 f_globsens = function(p_sens)
-    p_all = [p_sens;[94.3,75.0]]
+    p_all = [p_sens;[wts[1],rates[1]]]
     tmp_prob = remake(prob, p = p_all)
-    tmp_sol = solve(tmp_prob, Tsit5(), save_idxs=[15])
+    tmp_sol = solve(tmp_prob, Tsit5(), save_idxs=[15], callback=cbs[1])
     auc, err = quadgk(tmp_sol, 0.0, 48.0)
     return(auc[1])
 end
@@ -85,6 +87,8 @@ Plots.hline!([0.05], linestyle=:dash)
 
 plot_sens = Plots.plot(plot_sens_single, plot_sens_total, xrotation = 45)
 savefig(plot_sens, joinpath(figPath, "sensitivity.pdf"))
+
+#######
 
 ## Bayesian inference ##
 @model function fitPBPK(data, prob, nSubject, rates, times, wts, cbs, VVBs, BP) # data should be a Vector
@@ -244,4 +248,38 @@ plot_ppc = Gadfly.plot(x=dat_obs2.TIME, y=dat_obs2.DNDV, Geom.point, Scale.y_log
 plot_tmp = PDF(joinpath(figPath, "PPC.pdf"), 17cm, 12cm)
 draw(plot_tmp, plot_ppc)
 
+#######
+
+## simulation ##
+
+# simulate a 50 mg single and multiple daily doses
+# get inferred params
+df_params1 = DataFrame(mcmcchains)[:,3:10]
+
+df_params2 = @chain begin
+    df_params1
+    @transform(:ηᵢ = rand(Normal(), nrow(df_params1)))
+    @transform(:CLintᵢ = :ĈLint .* exp.(:ω .* :ηᵢ),
+               :WT = rand(wts, nrow(df_params1)),
+               :RATE = 50.0 / (10.0/60.0))  # 50 mg infused over 10 min
+end
+
+# run simulation
+## infusion callback
+cb = PresetTimeCallback([10.0/60.0], affect!)
+
+### define new problem for simulation
+function prob_func_sim(prob,i,repeat)
+    ps = [df_params2.CLintᵢ[i], df_params2.KbBR[i], df_params2.KbMU[i], df_params2.KbAD[i], df_params2.KbBO[i], df_params2.KbRB[i], df_params2.WT[i], df_params2.RATE[i]]
+    remake(prob, p=ps, tspan=(0.0,48.0))
+end
+
+### simulate
+sim_ensemble_prob = EnsembleProblem(prob, prob_func=prob_func_sim)
+sim_ensemble_sol = solve(sim_ensemble_prob, Tsit5(), save_idxs=[15], callback=cb, saveat=0.1, trajectories=nrow(df_params2)) 
+
+# plot
+summ_sim = EnsembleSummary(sim_ensemble_sol)
+#pyplot()
+Plots.plot(summ_sim)
 
