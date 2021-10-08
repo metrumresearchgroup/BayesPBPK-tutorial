@@ -80,9 +80,9 @@ bounds = [[1000.0,1500.0],[1.0,10.0],[1.0,10.0],[1.0,10.0],[1.0,10.0],[1.0,10.0]
 #### Sobol
 @time s = GlobalSensitivity.gsa(f_globsens, Sobol(), bounds, N=1000)
 
-plot_sens_total = Plots.bar(["CLint","KbBR","KbMU","KbAD","KbBO","KbRB"], s.ST, title="Total Order Indices", ylabel="Index", legend=false, ylim=(0.0,0.5))
+plot_sens_total = Plots.bar(["CLint","KbBR","KbMU","KbAD","KbBO","KbRB"], s.ST, title="Total Order Indices", ylabel="Index", legend=false)
 Plots.hline!([0.05], linestyle=:dash)
-plot_sens_single = Plots.bar(["CLint","KbBR","KbMU","KbAD","KbBO","KbRB"], s.S1, title="First Order Indices", ylabel="Index", legend=false, ylim=(0.0,0.5))
+plot_sens_single = Plots.bar(["CLint","KbBR","KbMU","KbAD","KbBO","KbRB"], s.S1, title="First Order Indices", ylabel="Index", legend=false)
 Plots.hline!([0.05], linestyle=:dash)
 
 plot_sens = Plots.plot(plot_sens_single, plot_sens_total, xrotation = 45)
