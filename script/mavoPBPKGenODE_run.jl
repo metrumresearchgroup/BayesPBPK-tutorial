@@ -298,12 +298,13 @@ df_sim2 = @chain begin
                :lo = quantile(:cent, 0.05),
                :hi = quantile(:cent, 0.95))
     @subset(:ID .== 1)
+    unique
 end
 
 set_default_plot_size(17cm, 12cm)
 
 plot_sim = Gadfly.plot(x=df_sim2.time, y=df_sim2.med, Geom.line, Scale.y_log10, Theme(background_color="white", default_color="black"), Guide.xlabel("Time (h)"), Guide.ylabel("Mavoglurant concentration (ng/mL)", orientation=:vertical),
-    layer(x=df_sim2.time, ymin=df_sim2.lo, ymax=df_sim2.hi, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.8]))
+    layer(x=df_sim2.time, ymin=df_sim2.lo, ymax=df_sim2.hi, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.5]))
 
 plot_tmp = PDF(joinpath(figPath, "sim.pdf"), 17cm, 12cm)
 draw(plot_tmp, plot_sim)
