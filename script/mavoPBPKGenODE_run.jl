@@ -258,9 +258,10 @@ df_params1 = DataFrame(mcmcchains)[:,3:10]
 
 df_params2 = @chain begin
     df_params1
-    @transform(:ηᵢ = rand(Normal(), nrow(df_params1)))
+    @transform(:ηᵢ = rand(Normal(), nrow(df_params1)),
+               :WT = rand(wts, nrow(df_params1)))
     @transform(:CLintᵢ = :ĈLint .* exp.(:ω .* :ηᵢ),
-               :WT = rand(wts, nrow(df_params1)),
+               :VVB = (5.62 .* :WT ./ 100) ./ 1.040,
                :RATE = 50.0 / (10.0/60.0))  # 50 mg infused over 10 min
 end
 
@@ -278,8 +279,33 @@ end
 sim_ensemble_prob = EnsembleProblem(prob, prob_func=prob_func_sim)
 sim_ensemble_sol = solve(sim_ensemble_prob, Tsit5(), save_idxs=[15], callback=cb, saveat=0.1, trajectories=nrow(df_params2)) 
 
-# plot
-summ_sim = EnsembleSummary(sim_ensemble_sol)
-#pyplot()
-Plots.plot(summ_sim)
+# calc stats
+df_sim1 = []
+for i in 1:nrow(df_params1)
+    df_tmp = @chain begin
+        df_tmp = DataFrame(sim_ensemble_sol[i])
+        rename(:timestamp => :time, :value1 => :cent)
+        @transform!(:ID = i,
+                    :cent = :cent / (df_params2.VVB[i]*BP/1000.0)) 
+    end
+    push!(df_sim1, df_tmp)
+end
+
+df_sim2 = @chain begin
+    vcat(df_sim1...)
+    groupby(:time)
+    @transform(:med = median(:cent),
+               :lo = quantile(:cent, 0.05),
+               :hi = quantile(:cent, 0.95))
+    @subset(:ID .== 1)
+end
+
+set_default_plot_size(17cm, 12cm)
+
+plot_sim = Gadfly.plot(x=df_sim2.time, y=df_sim2.med, Geom.line, Scale.y_log10, Theme(background_color="white", default_color="black"), Guide.xlabel("Time (h)"), Guide.ylabel("Mavoglurant concentration (ng/mL)", orientation=:vertical),
+    layer(x=df_sim2.time, ymin=df_sim2.lo, ymax=df_sim2.hi, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.8]))
+
+plot_tmp = PDF(joinpath(figPath, "sim.pdf"), 17cm, 12cm)
+draw(plot_tmp, plot_sim)
+
 
