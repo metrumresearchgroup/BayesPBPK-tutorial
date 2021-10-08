@@ -294,7 +294,7 @@ end
 df_sim2 = @chain begin
     vcat(df_sim1...)
     groupby(:time)
-    @transform(:med = median(:cent),
+    @transform(:med = quantile(:cent, 0.5),
                :lo = quantile(:cent, 0.05),
                :hi = quantile(:cent, 0.95))
     @subset(:ID .== 1)
