@@ -18,8 +18,8 @@ figPath = mkpath(joinpath(figDir, string(modName, "_jl")))
 tabPath = mkpath(joinpath(tabDir, string(modName, "_jl")))
 
 # read data
-dat = CSV.read("data/Mavoglurant_A2121_nmpk.csv", DataFrame)
-dat = dat[dat.ID .<= 812,:]
+dat_orig = CSV.read("data/Mavoglurant_A2121_nmpk.csv", DataFrame)
+dat = dat_orig[dat_orig.ID .<= 812,:]
 dat_obs = dat[dat.MDV .== 0,:]  # grab first 20 subjects ; remove missing obs
 
 # load model
@@ -169,6 +169,9 @@ plot_chains = Plots.plot(plot_chains1, plot_chains2, layout = (1,2))
 savefig(plot_chains, joinpath(figPath, "MCMCTrace.pdf"))
 
 #---# predictive checks #---#
+
+#--# conditional on chains #--#
+
 dat_missing = Vector{Missing}(missing, length(dat_obs.DV)) # vector of `missing`
 mod_pred = fitPBPK(dat_missing, prob, nSubject, rates, times, wts, cbs, VVBs, BP)
 #pred = predict(mod_pred, mcmcchains)  # posterior ; conditioned on each sample in chains
@@ -245,16 +248,118 @@ plot_ppc = Gadfly.plot(x=dat_obs2.TIME, y=dat_obs2.DNDV, Geom.point, Scale.y_log
     layer(x=df_vpc_pred2.TIME, ymin=df_vpc_pred2.loLo, ymax=df_vpc_pred2.hiLo, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.5]),
     layer(x=df_vpc_pred2.TIME, ymin=df_vpc_pred2.loHi, ymax=df_vpc_pred2.hiHi, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.5]))
 
-plot_tmp = PDF(joinpath(figPath, "PPC.pdf"), 17cm, 12cm)
+plot_tmp = PDF(joinpath(figPath, "PPCCond.pdf"), 17cm, 12cm)
 draw(plot_tmp, plot_ppc)
+
+
+#--# new population #--#
+
+# get 500 replicates of inferred parameters
+df_params = DataFrame(mcmcchains)[:,3:10]
+
+## new etas
+ηs = reshape(rand(Normal(0.0, 1.0), nSubject*nrow(df_params1)), nrow(df_params1), nSubject)
+
+array_pred = Array{Float64}(undef, nrow(df_params), nrow(dat_obs))
+
+for j in 1:nrow(df_params)
+    KbBR = df_params[j,:KbBR]
+    KbMU = df_params[j,:KbMU]
+    KbAD = df_params[j,:KbAD]
+    KbBO = df_params[j,:KbBO]
+    KbRB = df_params[j,:KbRB]
+
+    CLintᵢ = df_params[j,:ĈLint] .* exp.(df_params[j,:ω] .* ηs[j,:])
+
+    # simulate
+    function prob_func(prob,i,repeat)
+        ps = [CLintᵢ[i], KbBR, KbMU, KbAD, KbBO, KbRB, wts[i], rates[i]]
+        remake(prob, p=ps, saveat=times[i], callback=cbs[i])
+    end
+    
+    tmp_ensemble_prob = EnsembleProblem(prob, prob_func=prob_func)
+    tmp_ensemble_sol = solve(tmp_ensemble_prob, Tsit5(), trajectories=nSubject)
+    
+    predicted = []
+    for i in 1:nSubject
+        times_tmp = times[i]
+        idx = findall(x -> x in times_tmp, tmp_ensemble_sol[i].t)
+        tmp_sol = Array(tmp_ensemble_sol[i])[15,idx] ./ (VVBs[i]*BP/1000.0)
+        append!(predicted, tmp_sol)
+    end
+
+    array_pred[j, :] = predicted
+end
+
+df_pred_new = DataFrame(array_pred, :auto)
+@transform!(df_pred_new, :iteration = 1:size(array_pred)[1])
+
+df_vpc_pred_new = @chain begin
+    df_pred_new
+    DataFramesMeta.stack(1:268)
+    @orderby(:iteration)
+    hcat(select(repeat(dat_obs, 1000), [:ID,:TIME,:DOSE]))
+    @transform(:DNDV = :value ./ :DOSE,
+    :bins = cut(:TIME, bins, labels = labels))
+
+    groupby([:iteration, :bins])
+    @transform(:lo = quantile(:DNDV, 0.05),
+               :med = quantile(:DNDV, 0.5),
+               :hi = quantile(:DNDV, 0.95))
+    
+    groupby(:bins)
+    @transform(:loLo = quantile(:lo, 0.025),
+               :medLo = quantile(:lo, 0.5),
+               :hiLo = quantile(:lo, 0.975),
+               :loMed = quantile(:med, 0.025),
+               :medMed = quantile(:med, 0.5),
+               :hiMed = quantile(:med, 0.975),
+               :loHi = quantile(:hi, 0.025),
+               :medHi = quantile(:hi, 0.5),
+               :hiHi = quantile(:hi, 0.975))
+end
+
+df_vpc_pred_new2 = @orderby(unique(df_vpc_pred_new[!,[5;12:20]]), :TIME)
+
+### plot
+#dat_obs2 = @transform(dat_obs, :DNDV = :DV ./ :DOSE)
+
+set_default_plot_size(17cm, 12cm)
+
+plot_ppc_new = Gadfly.plot(x=dat_obs2.TIME, y=dat_obs2.DNDV, Geom.point, Scale.y_log10, Theme(background_color="white", default_color="black"), alpha=[0.2], Guide.xlabel("Time (h)"), Guide.ylabel("Mavoglurant dose-normalized concentration (ng/mL/mg)", orientation=:vertical),
+    layer(x=df_vpc_obs.TIME, y=df_vpc_obs.med, Geom.line, Theme(default_color="black")),
+    layer(x=df_vpc_obs.TIME, y=df_vpc_obs.lo, Geom.line, Theme(default_color="black")),
+    layer(x=df_vpc_obs.TIME, y=df_vpc_obs.hi, Geom.line, Theme(default_color="black")),
+    layer(x=df_vpc_pred_new2.TIME, ymin=df_vpc_pred_new2.loMed, ymax=df_vpc_pred_new2.hiMed, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.8]),
+    layer(x=df_vpc_pred_new2.TIME, ymin=df_vpc_pred_new2.loLo, ymax=df_vpc_pred_new2.hiLo, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.5]),
+    layer(x=df_vpc_pred_new2.TIME, ymin=df_vpc_pred_new2.loHi, ymax=df_vpc_pred_new2.hiHi, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.5]))
+
+plot_tmp = PDF(joinpath(figPath, "PPCPred.pdf"), 17cm, 12cm)
+draw(plot_tmp, plot_ppc_new)
 
 #######
 
 ## simulation ##
 
-# simulate a 50 mg single and multiple daily doses
-# get inferred params
+# get wts for 500 individuals
+wts_sim = @chain begin 
+    dat_orig 
+    @subset(:EVID .== 1) 
+    unique(:ID)
+    @select(:WT)
+    Array
+end
+wts_sim = sample(wts_sim, 500, replace=true)
+vvbs_sim = (5.62 .* wts_sim ./ 100) ./ 1.040
+
+# get 500 replicates of inferred parameters
 df_params1 = DataFrame(mcmcchains)[:,3:10]
+df_params2 = df_params1[sample(1:nrow(df_params1), 500, replace=false),:]
+
+# simulate a 50 mg single and multiple daily doses
+
+
+
 
 df_params2 = @chain begin
     df_params1
