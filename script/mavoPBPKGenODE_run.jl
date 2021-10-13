@@ -254,7 +254,6 @@ draw(plot_tmp, plot_ppc)
 
 #--# new population #--#
 
-# get 500 replicates of inferred parameters
 df_params = DataFrame(mcmcchains)[:,3:10]
 
 ## new etas
@@ -288,7 +287,8 @@ for j in 1:nrow(df_params)
         append!(predicted, tmp_sol)
     end
 
-    array_pred[j, :] = predicted
+    #array_pred[j, :] = predicted
+    array_pred[j, :] = rand.(LogNormal.(log.(predicted), df_params[j,:σ]))
 end
 
 df_pred_new = DataFrame(array_pred, :auto)
@@ -360,7 +360,7 @@ df_params2 = df_params1[sample(1:nrow(df_params1), 500, replace=false),:]
 
 
 
-
+#=
 df_params2 = @chain begin
     df_params1
     @transform(:ηᵢ = rand(Normal(), nrow(df_params1)),
@@ -413,5 +413,6 @@ plot_sim = Gadfly.plot(x=df_sim2.time, y=df_sim2.med, Geom.line, Scale.y_log10, 
 
 plot_tmp = PDF(joinpath(figPath, "sim.pdf"), 17cm, 12cm)
 draw(plot_tmp, plot_sim)
+=#
 
 
