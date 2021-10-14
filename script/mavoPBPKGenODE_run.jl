@@ -14,6 +14,7 @@ modDir = "model"
 modName = "mavoPBPKGenODE"
 tabDir = joinpath("deliv","table")
 figDir = joinpath("deliv","figure")
+modPath = mkpath(joinpath(modDir, string(modName, "_jl")))
 figPath = mkpath(joinpath(figDir, string(modName, "_jl")))
 tabPath = mkpath(joinpath(tabDir, string(modName, "_jl")))
 
@@ -256,8 +257,11 @@ draw(plot_tmp, plot_ppc)
 
 df_params = DataFrame(mcmcchains)[:,3:10]
 
+# save CSV
+#CSV.write(joinpath(modPath, "df_params.csv"), df_params)
+
 ## new etas
-ηs = reshape(rand(Normal(0.0, 1.0), nSubject*nrow(df_params1)), nrow(df_params1), nSubject)
+ηs = reshape(rand(Normal(0.0, 1.0), nSubject*nrow(df_params)), nrow(df_params), nSubject)
 
 array_pred = Array{Float64}(undef, nrow(df_params), nrow(dat_obs))
 
@@ -287,12 +291,23 @@ for j in 1:nrow(df_params)
         append!(predicted, tmp_sol)
     end
 
-    #array_pred[j, :] = predicted
     array_pred[j, :] = rand.(LogNormal.(log.(predicted), df_params[j,:σ]))
 end
 
 df_pred_new = DataFrame(array_pred, :auto)
 @transform!(df_pred_new, :iteration = 1:size(array_pred)[1])
+
+# save version for R's vpc
+df_pred_new2 = @chain begin
+    df_pred_new
+    DataFramesMeta.stack(1:268)
+    @orderby(:iteration)
+    hcat(select(repeat(dat_obs, 1000), [:ID,:TIME,:DOSE]))
+    @transform(:DNDV = :value ./ :DOSE)
+end
+
+# save CSV
+#CSV.write(joinpath(modPath, "df_pred.csv"), df_pred_new2)
 
 df_vpc_pred_new = @chain begin
     df_pred_new
@@ -353,11 +368,99 @@ wts_sim = sample(wts_sim, 500, replace=true)
 vvbs_sim = (5.62 .* wts_sim ./ 100) ./ 1.040
 
 # get 500 replicates of inferred parameters
-df_params1 = DataFrame(mcmcchains)[:,3:10]
-df_params2 = df_params1[sample(1:nrow(df_params1), 500, replace=false),:]
+df_params_sim1 = DataFrame(mcmcchains)[:,3:10]
+df_params_sim2 = df_params_sim1[sample(1:nrow(df_params_sim1), 500, replace=false),:]
 
-# simulate a 50 mg single and multiple daily doses
+## new etas
+ηs_sim = reshape(rand(Normal(0.0, 1.0), 500*500), 500, 500)
 
+# create array to hold results
+times_sim = [0.0:0.1:48.0;]
+array_pred_sim = Array{Float64}(undef, 500, length(times_sim)*500)
+
+# simulate a 50 mg single
+## infusion callback
+dose = 50.0
+cb = PresetTimeCallback([10.0/60.0], affect!)
+
+for j in 1:nrow(df_params_sim2)
+    KbBR = df_params_sim2[j,:KbBR]
+    KbMU = df_params_sim2[j,:KbMU]
+    KbAD = df_params_sim2[j,:KbAD]
+    KbBO = df_params_sim2[j,:KbBO]
+    KbRB = df_params_sim2[j,:KbRB]
+
+    CLintᵢ = df_params_sim2[j,:ĈLint] .* exp.(df_params_sim2[j,:ω] .* ηs_sim[j,:])
+
+    # simulate
+    function prob_func_sim(prob,i,repeat)
+        ps = [CLintᵢ[i], KbBR, KbMU, KbAD, KbBO, KbRB, wts_sim[i], 300.0]
+        remake(prob, p=ps, tspan=(0.0,48.0))
+    end
+    
+    sim_ensemble_prob = EnsembleProblem(prob, prob_func=prob_func_sim)
+    sim_ensemble_sol = solve(sim_ensemble_prob, Tsit5(), save_idxs=[15], callback=cb, saveat=times_sim, trajectories=nrow(df_params_sim2))
+
+    predicted = []
+    for i in 1:500
+        idx = findall(x -> x in times_sim, sim_ensemble_sol[i].t)
+        tmp_sol = Array(sim_ensemble_sol[i])[1,idx] ./ (vvbs_sim[i]*BP/1000.0)
+        append!(predicted, tmp_sol)
+    end
+
+    array_pred_sim[j, :] = rand.(LogNormal.(log.(predicted), df_params_sim2[j,:σ]))
+end
+
+# get stats
+
+df_pred_sim = DataFrame(array_pred_sim, :auto)
+@transform!(df_pred_sim, :iteration = 1:size(array_pred_sim)[1])
+
+df_pred_sim2 = @chain begin
+    df_pred_sim
+    DataFramesMeta.stack(1:240500)
+    @orderby(:iteration)
+    @transform(:ID = repeat(repeat(1:500,inner=length(times_sim)), 500),
+               :TIME = repeat(times_sim, 500*500),
+               :DOSE = dose)
+    @transform(:DNDV = :value ./ :DOSE)
+
+    groupby([:iteration, :TIME])
+    @transform(:lo = quantile(:DNDV, 0.05),
+               :med = quantile(:DNDV, 0.5),
+               :hi = quantile(:DNDV, 0.95))
+    
+    groupby(:TIME)
+    @transform(:loLo = quantile(:lo, 0.025),
+               :medLo = quantile(:lo, 0.5),
+               :hiLo = quantile(:lo, 0.975),
+               :loMed = quantile(:med, 0.025),
+               :medMed = quantile(:med, 0.5),
+               :hiMed = quantile(:med, 0.975),
+               :loHi = quantile(:hi, 0.025),
+               :medHi = quantile(:hi, 0.5),
+               :hiHi = quantile(:hi, 0.975))
+end
+
+df_pred_summ = @orderby(unique(df_pred_sim2[!,[5;11:19]]), :TIME)
+
+# save CSV
+#CSV.write(joinpath(modPath, "df_pred.csv"), df_pred_new2)
+
+### plot
+#dat_obs2 = @transform(dat_obs, :DNDV = :DV ./ :DOSE)
+
+set_default_plot_size(17cm, 12cm)
+
+plot_pred_summ = Gadfly.plot(x=df_pred_summ.TIME, ymin=df_pred_summ.loMed, ymax=df_pred_summ.hiMed, Geom.ribbon, Scale.y_log10, Theme(default_color="deepskyblue", background_color="white"), alpha=[0.8], Guide.xlabel("Time (h)"), Guide.ylabel("Mavoglurant dose-normalized concentration (ng/mL/mg)", orientation=:vertical),
+    layer(x=df_pred_summ.TIME, ymin=df_pred_summ.loLo, ymax=df_pred_summ.hiLo, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.5]),
+    layer(x=df_pred_summ.TIME, ymin=df_pred_summ.loHi, ymax=df_pred_summ.hiHi, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.5]),
+    layer(x=df_pred_summ.TIME, y=df_pred_summ.medMed, Geom.line, Theme(default_color="black")),
+    layer(x=df_pred_summ.TIME, y=df_pred_summ.medLo, Geom.line, Theme(default_color="black")),
+    layer(x=df_pred_summ.TIME, y=df_pred_summ.medHi, Geom.line, Theme(default_color="black")))
+
+plot_tmp = PDF(joinpath(figPath, "SimPred.pdf"), 17cm, 12cm)
+draw(plot_tmp, plot_pred_summ)
 
 
 #=
