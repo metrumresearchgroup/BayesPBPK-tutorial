@@ -352,6 +352,59 @@ plot_ppc_new = Gadfly.plot(x=dat_obs2.TIME, y=dat_obs2.DNDV, Geom.point, Scale.y
 plot_tmp = PDF(joinpath(figPath, "PPCPred.pdf"), 17cm, 12cm)
 draw(plot_tmp, plot_ppc_new)
 
+#--# individual plots #--#
+
+df_cObs = @chain begin
+    df_vpc_obs
+    @select(:ID,:TIME,:DV,:DOSE)
+end
+
+df_cCond = @chain begin
+    df_vpc_pred
+    groupby([:ID,:TIME])
+    @transform(:loCond = quantile(:value, 0.05),
+               :medCond = quantile(:value, 0.5),
+               :hiCond = quantile(:value, 0.95))
+    @select(:ID, :TIME, :DOSE, :loCond, :medCond, :hiCond)
+    unique()
+end
+
+df_cPred = @chain begin
+    df_vpc_pred_new
+    groupby([:ID,:TIME])
+    @transform(:loPred = quantile(:value, 0.05),
+               :medPred = quantile(:value, 0.5),
+               :hiPred = quantile(:value, 0.95))
+    @select(:ID, :TIME, :DOSE, :loPred, :medPred, :hiPred)
+    unique()
+end
+
+# join all data
+df_cAll = hcat(df_cObs, 
+               @select(df_cCond, :loCond, :medCond, :hiCond),
+               @select(df_cPred, :loPred, :medPred, :hiPred))
+
+# save CSV for plotting in R
+CSV.write(joinpath(modPath, "df_ind.csv"), df_cAll)
+
+#=
+# plot
+plot_ind = Gadfly.plot(df_call, x=:TIME, y=:DV, xgroup=:ID, Geom.subplot_grid(Geom.point),
+                       Theme(background_color="white", default_color="black"), 
+                       Scale.y_log10) 
+plot_ind = Gadfly.plot(df_call, x=:TIME, Theme(background_color="white", default_color="black"), Scale.y_log10, 
+    layer(y=:DV, Geom.point))
+
+
+plot_ind = Gadfly.plot(x=dat_obs2.TIME, y=dat_obs2.DNDV, Geom.point, Scale.y_log10, Theme(background_color="white", default_color="black"), alpha=[0.2], Guide.xlabel("Time (h)"), Guide.ylabel("Mavoglurant dose-normalized concentration (ng/mL/mg)", orientation=:vertical),
+layer(x=df_vpc_obs.TIME, y=df_vpc_obs.med, Geom.line, Theme(default_color="black")),
+layer(x=df_vpc_obs.TIME, y=df_vpc_obs.lo, Geom.line, Theme(default_color="black")),
+layer(x=df_vpc_obs.TIME, y=df_vpc_obs.hi, Geom.line, Theme(default_color="black")),
+layer(x=df_vpc_pred_new2.TIME, ymin=df_vpc_pred_new2.loMed, ymax=df_vpc_pred_new2.hiMed, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.8]),
+layer(x=df_vpc_pred_new2.TIME, ymin=df_vpc_pred_new2.loLo, ymax=df_vpc_pred_new2.hiLo, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.5]),
+layer(x=df_vpc_pred_new2.TIME, ymin=df_vpc_pred_new2.loHi, ymax=df_vpc_pred_new2.hiHi, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.5]))
+=#
+
 #######
 
 ## simulation ##
@@ -426,9 +479,9 @@ df_pred_sim2 = @chain begin
     @transform(:DNDV = :value ./ :DOSE)
 
     groupby([:iteration, :TIME])
-    @transform(:lo = quantile(:DNDV, 0.05),
-               :med = quantile(:DNDV, 0.5),
-               :hi = quantile(:DNDV, 0.95))
+    @transform(:lo = quantile(:value, 0.05),
+               :med = quantile(:value, 0.5),
+               :hi = quantile(:value, 0.95))
     
     groupby(:TIME)
     @transform(:loLo = quantile(:lo, 0.025),
@@ -452,7 +505,7 @@ df_pred_summ = @orderby(unique(df_pred_sim2[!,[5;11:19]]), :TIME)
 
 set_default_plot_size(17cm, 12cm)
 
-plot_pred_summ = Gadfly.plot(x=df_pred_summ.TIME, ymin=df_pred_summ.loMed, ymax=df_pred_summ.hiMed, Geom.ribbon, Scale.y_log10, Theme(default_color="deepskyblue", background_color="white"), alpha=[0.8], Guide.xlabel("Time (h)"), Guide.ylabel("Mavoglurant dose-normalized concentration (ng/mL/mg)", orientation=:vertical),
+plot_pred_summ = Gadfly.plot(x=df_pred_summ.TIME, ymin=df_pred_summ.loMed, ymax=df_pred_summ.hiMed, Geom.ribbon, Scale.y_log10, Theme(default_color="deepskyblue", background_color="white"), alpha=[0.8], Guide.xlabel("Time (h)"), Guide.ylabel("Mavoglurant concentration (ng/mL)", orientation=:vertical),
     layer(x=df_pred_summ.TIME, ymin=df_pred_summ.loLo, ymax=df_pred_summ.hiLo, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.5]),
     layer(x=df_pred_summ.TIME, ymin=df_pred_summ.loHi, ymax=df_pred_summ.hiHi, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.5]),
     layer(x=df_pred_summ.TIME, y=df_pred_summ.medMed, Geom.line, Theme(default_color="black")),
@@ -462,60 +515,5 @@ plot_pred_summ = Gadfly.plot(x=df_pred_summ.TIME, ymin=df_pred_summ.loMed, ymax=
 plot_tmp = PDF(joinpath(figPath, "SimPred.pdf"), 17cm, 12cm)
 draw(plot_tmp, plot_pred_summ)
 
-
-#=
-df_params2 = @chain begin
-    df_params1
-    @transform(:ηᵢ = rand(Normal(), nrow(df_params1)),
-               :WT = rand(wts, nrow(df_params1)))
-    @transform(:CLintᵢ = :ĈLint .* exp.(:ω .* :ηᵢ),
-               :VVB = (5.62 .* :WT ./ 100) ./ 1.040,
-               :RATE = 50.0 / (10.0/60.0))  # 50 mg infused over 10 min
-end
-
-# run simulation
-## infusion callback
-cb = PresetTimeCallback([10.0/60.0], affect!)
-
-### define new problem for simulation
-function prob_func_sim(prob,i,repeat)
-    ps = [df_params2.CLintᵢ[i], df_params2.KbBR[i], df_params2.KbMU[i], df_params2.KbAD[i], df_params2.KbBO[i], df_params2.KbRB[i], df_params2.WT[i], df_params2.RATE[i]]
-    remake(prob, p=ps, tspan=(0.0,48.0))
-end
-
-### simulate
-sim_ensemble_prob = EnsembleProblem(prob, prob_func=prob_func_sim)
-sim_ensemble_sol = solve(sim_ensemble_prob, Tsit5(), save_idxs=[15], callback=cb, saveat=0.1, trajectories=nrow(df_params2)) 
-
-# calc stats
-df_sim1 = []
-for i in 1:nrow(df_params1)
-    df_tmp = @chain begin
-        df_tmp = DataFrame(sim_ensemble_sol[i])
-        rename(:timestamp => :time, :value1 => :cent)
-        @transform!(:ID = i,
-                    :cent = :cent / (df_params2.VVB[i]*BP/1000.0)) 
-    end
-    push!(df_sim1, df_tmp)
-end
-
-df_sim2 = @chain begin
-    vcat(df_sim1...)
-    groupby(:time)
-    @transform(:med = quantile(:cent, 0.5),
-               :lo = quantile(:cent, 0.05),
-               :hi = quantile(:cent, 0.95))
-    @subset(:ID .== 1)
-    unique
-end
-
-set_default_plot_size(17cm, 12cm)
-
-plot_sim = Gadfly.plot(x=df_sim2.time, y=df_sim2.med, Geom.line, Scale.y_log10, Theme(background_color="white", default_color="black"), Guide.xlabel("Time (h)"), Guide.ylabel("Mavoglurant concentration (ng/mL)", orientation=:vertical),
-    layer(x=df_sim2.time, ymin=df_sim2.lo, ymax=df_sim2.hi, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.5]))
-
-plot_tmp = PDF(joinpath(figPath, "sim.pdf"), 17cm, 12cm)
-draw(plot_tmp, plot_sim)
-=#
 
 
