@@ -142,10 +142,10 @@ mod = fitPBPK(dat_obs.DV, prob, nSubject, rates, times, wts, cbs, VVBs, BP)
 #@time mcmcchains_prior = sample(mod, Prior(), MCMCThreads(), 250, 4)  # parallel
 
 ## save mcmcchains
-#write(joinpath(modDir, string(modName, "chains.jls")), mcmcchains)
+#write(joinpath(modPath, string(modName, "chains.jls")), mcmcchains)
 
 ##load saved chains
-#mcmcchains = read(joinpath(modDir, string(modName, "chains.jls")), Chains)
+#mcmcchains = read(joinpath(modPath, string(modName, "chains.jls")), Chains)
 
 
 #---# diagnostics #---#
