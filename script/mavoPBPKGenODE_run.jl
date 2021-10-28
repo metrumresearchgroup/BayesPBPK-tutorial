@@ -169,6 +169,20 @@ plot_chains2 = StatsPlots.plot(mcmcchains[:,5:8,:])
 plot_chains = Plots.plot(plot_chains1, plot_chains2, layout = (1,2))
 savefig(plot_chains, joinpath(figPath, "MCMCTrace.pdf"))
 
+#=
+## rhat
+df_tmp = @orderby(DataFrame(summ)[1:8,:], :rhat)
+plot_rhat = Plots.bar(string.(df_tmp.parameters), df_tmp.rhat, orientation=:h, legend = false, xlim=[0.99,1.05], xticks=[1.0,1.05], xlabel = "R̂")
+Plots.vline!([1.0,1.05], linestyle=[:solid,:dash])
+savefig(plot_rhat, joinpath(figPath, "rhat.pdf"))
+
+## neff
+df_tmp = @orderby(@transform!(df_tmp, :neff = :ess ./ 1000.0), :neff)
+plot_neff = Plots.bar(string.(df_tmp.parameters), df_tmp.neff, orientation=:h, legend = false, xlim=[0.0,2.5], xticks=[0.0:0.25:2.5;], xlabel = "Neff/N")
+Plots.vline!([0.1,0.5,1.0], linestyle=:dash)
+savefig(plot_neff, joinpath(figPath, "neff.pdf"))
+=#
+
 #---# predictive checks #---#
 
 #--# conditional on chains #--#
