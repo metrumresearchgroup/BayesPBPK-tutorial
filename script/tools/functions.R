@@ -254,3 +254,5 @@ hi90 <- function(x) quantile(x, probs=c(0.9), na.rm=T)
 lo25 <- function(x) quantile(x, probs=c(0.25), na.rm=T)
 hi75 <- function(x) quantile(x, probs=c(0.75), na.rm=T)
 
+sig <- function(x) signif(x, digits = 3)
+

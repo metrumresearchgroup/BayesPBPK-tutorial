@@ -15,6 +15,7 @@ library(tidyverse)
 library(vpc)
 library(posterior)
 library(bayesplot)
+library(cowplot)
 
 # environment
 modelName <- "mavoPBPKGenODE_jl"
@@ -32,8 +33,74 @@ tabDir <- file.path(projectDir, "deliv", "table", modelName)
 ## read data
 df_params <- read.csv("../model/mavoPBPKGenODE_jl/df_params.csv")
 df_params2 <- as_draws_df(df_params)
-fitSummParams <- summarise_draws(df_params2)
+fitSummParams <- summarise_draws(df_params2) %>%
+  mutate(ess_bulk_N = ess_bulk/1000,
+         ess_tail_N = ess_tail/1000)
 write.csv(fitSummParams, file = file.path(tabDir, paste(modelName, "ParameterTable.csv", sep = "-")), quote = F, row.names = F)
+
+####################
+
+## neff_ratio
+fitSummParams2 <- fitSummParams %>% 
+  mutate(variable = factor(variable),
+         variable = fct_relevel(variable, c("ĈLint","ω","σ","KbMU","KbAD","KbBO","KbRB","KbBR")))
+
+fitSummParams3 <- fitSummParams %>% 
+  mutate(variable = factor(variable),
+         variable = fct_relevel(variable, c("ω","ĈLint","KbBO","KbRB","KbMU","KbBR","σ","KbAD")))
+
+fitSummParams4 <- fitSummParams %>% 
+  mutate(variable = factor(variable),
+         variable = fct_relevel(variable, c("KbMU","KbBR","σ","ω","KbAD","KbRB","ĈLint","KbBO")))
+
+plot_neff_ratio_bulk <- ggplot(data=fitSummParams2, aes(x=variable, y=ess_bulk_N, label=ess_bulk_N, color=ess_bulk_N)) +
+  geom_point(stat="identity") +
+  geom_segment(aes(y=0,
+               x=variable,
+               yend=ess_bulk_N,
+               xend = variable)) +
+  geom_hline(yintercept = c(0.1,0.5,1), lty=2, alpha=0.2) +
+  coord_flip() +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(y="Neff-bullk/N", x="") +
+  scale_y_continuous(breaks = c(0.1,0.5,1))
+
+plot_neff_ratio_tail <- ggplot(data=fitSummParams3, aes(x=variable, y=ess_tail_N, label=ess_tail_N, color=ess_tail_N)) +
+  geom_point(stat="identity") +
+  geom_segment(aes(y=0,
+                   x=variable,
+                   yend=ess_tail_N,
+                   xend = variable)) +
+  geom_hline(yintercept = c(0.1,0.5,1), lty=2, alpha=0.2) +
+  coord_flip() +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(y="Neff-tail/N", x="") +
+  scale_y_continuous(breaks = c(0.1,0.5,1))
+
+plot_rhat <- ggplot(data=fitSummParams4, aes(x=variable, y=rhat, label=rhat, color=rhat)) +
+  geom_point(stat="identity") +
+  geom_segment(aes(y=1,
+                   x=variable,
+                   yend=rhat,
+                   xend = variable)) +
+  geom_hline(yintercept = c(1,1.05), lty=2, alpha=0.2) +
+  coord_flip() +
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(y="Neff-tail/N", x="") +
+  scale_y_continuous(breaks = c(1,1.05),
+                     limits = c(0.99,1.05))
+
+plot_diag <- plot_grid(plot_rhat, plot_neff_ratio_bulk, plot_neff_ratio_tail, ncol = 3)
+
+# save
+plotFile <- mrggsave(list(plot_diag),
+                     scriptName,
+                     dir = figDir, stem = paste("diag"),
+                     onefile = TRUE,
+                     width=7, height=4)
 
 ####################
 
