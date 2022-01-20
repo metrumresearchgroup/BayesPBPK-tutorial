@@ -264,14 +264,6 @@ if(runAnalysis){
   cobsCond.rep <- as_draws_matrix(fit$draws(variables = c("cObsCond")))
   cobsPred.rep <- as_draws_matrix(fit$draws(variables = c("cObsPred")))
   
-  # cobsCond.rep <-
-  #   as_draws_df(fit$draws(variables=c("cObsCond"))) %>%
-  #   select(starts_with("cObsCond")) %>% as.matrix()
-  # 
-  # cobsPred.rep <-
-  #   as_draws_df(fit$draws(variables=c("cObsPred"))) %>%
-  #   select(starts_with("cObsPred")) %>% as.matrix()
-  
   time <- data[["time"]]
   nSubject <- data[["nSubject"]]
   nObs  <- data[["nObs"]]
