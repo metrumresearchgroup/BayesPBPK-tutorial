@@ -54,10 +54,12 @@ library(cmdstanr)
 library(posterior)
 library(vpc)
 library(mrggsave)
+library(cowplot)
 
 source(file.path(toolsDir, "stanTools.R"))
 source(file.path(toolsDir, "functions.R"))
 if(!useRStan) source(file.path(toolsDir, "cmdStanTools.R"))
+set_cmdstan_path(stanDir)
 
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
@@ -166,60 +168,97 @@ nPost <- 250 ## Number of post-burn-in samples per chain after thinning
 nBurn <- 250 ## Number of burn-in samples per chain after thinning
 nThin <- 1
 
+nCores <- 5
+
 nIter <- (nPost + nBurn) * nThin
 nBurnin <- nBurn * nThin
 
 if(fitModel){
+  # create stan model object
   file.copy(file.path(modelDir, paste0(modelName, ".stan")), 
             file.path(outDir, paste0(modelName, ".stan")), overwrite = TRUE)
   
-  compileModelMPI(model = file.path(outDir, modelName), stanDir = stanDir, nslaves = nslaves)
+  #mod <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")))
+  # locally
+  mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")), 
+                        cpp_options=list("TORSTEN_MPI=1","TBB_CXX_TYPE=clang"),force_recompile=TRUE,quiet=FALSE)
   
-  ##  mpi.spawn.Rslaves(nslaves = nslaves)
-  RNGkind("L'Ecuyer-CMRG")
-  mc.reset.stream()
+  # metworx
+  # mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")), 
+  #                       cpp_options=list("TORSTEN_MPI=1","TBB_CXX_TYPE=gcc","CXXFLAGS += -isystem /usr/include/mpich"),force_recompile=TRUE,quiet=FALSE)
+  # 
+  # fit <- mod$sample(data = data, chains = nChains, init = init,
+  #                   parallel_chains = nChains,
+  #                   iter_warmup = nBurn, iter_sampling = nPost,
+  #                   seed = sample(1:999999, 1), adapt_delta = 0.8,
+  #                   refresh = 10,
+  #                   output_dir = outDir)
   
-  chains <- 1:nChains
-  startTime <- Sys.time()
-  # given that I only have 6 functional cores on laptop, using mclapply won't help much
-  mclapply(chains,
-         function(chain, model, data, iter, warmup, thin, init) {
-           outDir <- file.path(outDir, chain)
-           dir.create(outDir)
-           with(data, stan_rdump(ls(data), file = file.path(outDir, "data.R")))
-           inits <- init()
-           with(inits, stan_rdump(ls(inits), file = file.path(outDir, "init.R")))
-           ## run without MPI parallelization
-           # runModel(model = model, data = file.path(outDir, "data.R"),
-           #          iter = iter, warmup = warmup, thin = thin,
-           #          init = file.path(outDir, "init.R"),
-           #          seed = sample(1:999999, 1),
-           #          chain = chain)
-           ## run with MPI parallelization
-           runModelMPI(model = model, data = file.path(outDir, "data.R"),
-                       iter = iter, warmup = warmup, thin = thin,
-                       save_warmup = 0,
-                       init = file.path(outDir, "init.R"),
-                       seed = sample(1:999999, 1),
-                       #adapt_delta = 0.95, stepsize = 0.01,
-                       refresh = 1,
-                       chain = chain,
-                       nslaves = nslaves)
-         },
-         model = file.path(outDir, modelName),
-         data = data,
-         init = init,
-         iter = nIter, warmup = nBurnin, thin = nThin,
-         mc.cores = min(nChains, detectCores()))
-  endTime <- Sys.time()
-  elapsedTime <- endTime - startTime
-  elapsedTime
+  fit <- mod$sample_mpi(data = data, chains = 1, init = init,
+                    #parallel_chains = nChains,
+                    iter_warmup = nBurn, iter_sampling = nPost,
+                    seed = sample(1:999999, 1), adapt_delta = 0.8,
+                    refresh = 10,
+                    output_dir = outDir,
+                    # the -l option will tag each output line with MPI process id
+                    mpi_args = list("n" = nCores, "-l" = NULL))
   
-  fit <- read_stan_csv(file.path(outDir, paste0(modelName, chains, ".csv")))
-  save(fit, file = file.path(outDir, paste(modelName, "Fit.Rsave", sep = "")))
+  fit$save_object(file.path(outDir, paste0(modelName, ".fit.RDS")))
 }else{
-  load(file.path(outDir, paste(modelName, "Fit.Rsave", sep = "")))
+  fit <- readRDS(file.path(outDir, paste0(modelName, ".fit.RDS")))
 }
+# 
+# if(fitModel){
+#   file.copy(file.path(modelDir, paste0(modelName, ".stan")), 
+#             file.path(outDir, paste0(modelName, ".stan")), overwrite = TRUE)
+#   
+#   compileModelMPI(model = file.path(outDir, modelName), stanDir = stanDir, nslaves = nslaves)
+#   
+#   ##  mpi.spawn.Rslaves(nslaves = nslaves)
+#   RNGkind("L'Ecuyer-CMRG")
+#   mc.reset.stream()
+#   
+#   chains <- 1:nChains
+#   startTime <- Sys.time()
+#   # given that I only have 6 functional cores on laptop, using mclapply won't help much
+#   mclapply(chains,
+#          function(chain, model, data, iter, warmup, thin, init) {
+#            outDir <- file.path(outDir, chain)
+#            dir.create(outDir)
+#            with(data, stan_rdump(ls(data), file = file.path(outDir, "data.R")))
+#            inits <- init()
+#            with(inits, stan_rdump(ls(inits), file = file.path(outDir, "init.R")))
+#            ## run without MPI parallelization
+#            # runModel(model = model, data = file.path(outDir, "data.R"),
+#            #          iter = iter, warmup = warmup, thin = thin,
+#            #          init = file.path(outDir, "init.R"),
+#            #          seed = sample(1:999999, 1),
+#            #          chain = chain)
+#            ## run with MPI parallelization
+#            runModelMPI(model = model, data = file.path(outDir, "data.R"),
+#                        iter = iter, warmup = warmup, thin = thin,
+#                        save_warmup = 0,
+#                        init = file.path(outDir, "init.R"),
+#                        seed = sample(1:999999, 1),
+#                        #adapt_delta = 0.95, stepsize = 0.01,
+#                        refresh = 1,
+#                        chain = chain,
+#                        nslaves = nslaves)
+#          },
+#          model = file.path(outDir, modelName),
+#          data = data,
+#          init = init,
+#          iter = nIter, warmup = nBurnin, thin = nThin,
+#          mc.cores = min(nChains, detectCores()))
+#   endTime <- Sys.time()
+#   elapsedTime <- endTime - startTime
+#   elapsedTime
+#   
+#   fit <- read_stan_csv(file.path(outDir, paste0(modelName, chains, ".csv")))
+#   save(fit, file = file.path(outDir, paste(modelName, "Fit.Rsave", sep = "")))
+# }else{
+#   load(file.path(outDir, paste(modelName, "Fit.Rsave", sep = "")))
+# }
 
 ################################################################################
 ################################################################################
@@ -244,7 +283,7 @@ if(runAnalysis){
   write.csv(fitSummParams, file = file.path(tabDir, paste(modelName, "ParameterTable.csv", sep = "-")), quote = F, row.names = F)
   
   # density
-  plot_mcmcDensityByChain <- mcmc_dens_overlay(subset.pars, facet_args=list(ncol=4))+facet_text(size=10)+theme(axis.text=element_text(size=10))
+  plot_mcmcDensityByChain <- mcmc_dens_overlay(subset.pars, facet_args=list(ncol=2))+facet_text(size=10)+theme(axis.text=element_text(size=10))
   plot_mcmcDensity <- mcmc_dens(subset.pars, facet_args=list(ncol=4))+facet_text(size=10)+theme(axis.text=element_text(size=10))
   
   # rhat
@@ -257,20 +296,24 @@ if(runAnalysis){
   
   # history
   draws_array <- fit$draws()
-  plot_mcmcHistory <- mcmc_trace(draws_array, pars = c(parametersToPlot[1:7], "omega[1]"))
+  plot_mcmcHistory <- mcmc_trace(draws_array, pars = c(parametersToPlot[1:7], "omega[1]"), facet_args = list(ncol = 2))
   
   # correlation
   plot_pairs <- mcmc_pairs(draws_array, pars = c(parametersToPlot[1:7], "omega[1]"), off_diag_args = list(size = 1.5), diag_fun = "dens")
+  
+  # join history and densities
+  plot_historyDensity <- plot_grid(plot_mcmcHistory, plot_mcmcDensityByChain, ncol = 2, labels = c("A","B"))
   
   # save
   plotFile <- mrggsave(list(plot_rhat,
                             plot_neff,
                             plot_mcmcHistory,
                             plot_mcmcDensityByChain,
-                            plot_mcmcDensity),
+                            plot_mcmcDensity,
+                            plot_historyDensity),
                        scriptName,
                        dir = figDir, stem = paste(modelName, "MCMCDiagnostics", sep = "-"),
-                       width = 7,
+                       width = 10, height = 8,
                        onefile = TRUE)
 
   plotFile_pairs <- mrggsave(list(plot_pairs),
@@ -358,7 +401,7 @@ if(runAnalysis){
                                        show = list(obs_dv = TRUE),              # plot observations?
                                        ylab = "Mavoglurant concentration (ng/mL)",
                                        xlab = "Time (h)") +
-    scale_y_continuous(trans = "log10")
+    scale_y_continuous(trans = "log10") + theme_bw()
   
   plot_ppc_cobsPred_summ_total <- vpc(sim = df_cobsPred,
                                       obs = df_cobs,                               # supply simulation and observation dataframes
@@ -378,7 +421,7 @@ if(runAnalysis){
                                       show = list(obs_dv = TRUE),              # plot observations?
                                       ylab = "Mavoglurant concentration (ng/mL)",
                                       xlab = "Time (h)") +
-    scale_y_continuous(trans = "log10")
+    scale_y_continuous(trans = "log10") + theme_bw()
   
   plot_ppc_cobsPred_summ_total_dosenorm <- vpc(sim = df_cobsPred,
                                                obs = df_cobs,                               # supply simulation and observation dataframes
@@ -398,13 +441,50 @@ if(runAnalysis){
                                                show = list(obs_dv = TRUE),              # plot observations?
                                                ylab = "Mavoglurant dose-normalized concentration (ng/mL/mg)",
                                                xlab = "Time (h)") +
-    scale_y_continuous(trans = "log10")
+    scale_y_continuous(trans = "log10", limits = c(0.01,100)) + theme_bw()
+  
+  df_cobsAll <- df_cobsCond %>%
+    rename(cCond = pred) %>%
+    bind_cols(df_cobsPred %>%
+                select(cPred = pred)) 
+  
+  df_cobsAll_summ <- df_cobsAll %>%
+    group_by(ID, time) %>%
+    mutate(loCond = lo(cCond),
+           medCond = med(cCond),
+           hiCond = hi(cCond),
+           loPred = lo(cPred),
+           medPred = med(cPred),
+           hiPred = hi(cPred)) %>%
+    slice(1) %>%
+    ungroup()
+  
+  # join with observed
+  df_simobs <- bind_cols(df_cobsAll_summ, df_cobs %>% select(cObs = obs))
+  
+  # plot
+  plot_ind <- ggplot(data=df_simobs, aes(x=time)) +
+    geom_point(aes(y=cObs)) +
+    geom_line(aes(y=medCond, color="Individual")) +
+    geom_ribbon(aes(ymin = loCond, ymax=hiCond, fill="Individual"), alpha=0.2) +
+    geom_line(aes(y=medPred, color="Population")) +
+    geom_ribbon(aes(ymin = loPred, ymax=hiPred, fill="Population"), alpha=0.2) +
+    facet_wrap(~ID2, ncol = 5) +
+    scale_y_continuous(trans="log10") +
+    scale_color_manual(name="", values = c("Individual" = "red", "Population" = "blue")) +
+    scale_fill_manual(name="", values = c("Individual" = "red", "Population" = "blue")) +
+    labs(x="Time (h)", y="Mavoglurant concentration (ng/mL)") +
+    theme_bw() +
+    theme(legend.position = "top",
+          legend.text = element_text(size = 15),
+          axis.title = element_text(size = 15))
   
   # save
   plotFile <- mrggsave(list(plot_ppc_cobsPred, 
                             plot_ppc_cobsPred_summ_total,
                             plot_ppc_cobsPred_summ_total_dosenorm,
-                            plot_ppc_cobsPred_summ_byDose),
+                            plot_ppc_cobsPred_summ_byDose,
+                            plot_ind),
                        scriptName,
                        dir = figDir, stem = paste(modelName,"PPC", sep = "-"),
                        onefile = TRUE,
