@@ -257,9 +257,6 @@ if(runAnalysis){
   #############
   
   ## predictive checks ##
-  ## get data
-  #data <- read_rdump(file.path(outDir, "1", "data.R"))
-  
   # get cobsPred and cobsCond
   cobsCond.rep <- as_draws_matrix(fit$draws(variables = c("cObsCond")))
   cobsPred.rep <- as_draws_matrix(fit$draws(variables = c("cObsPred")))

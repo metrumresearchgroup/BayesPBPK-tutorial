@@ -207,58 +207,6 @@ if(fitModel){
 }else{
   fit <- readRDS(file.path(outDir, paste0(modelName, ".fit.RDS")))
 }
-# 
-# if(fitModel){
-#   file.copy(file.path(modelDir, paste0(modelName, ".stan")), 
-#             file.path(outDir, paste0(modelName, ".stan")), overwrite = TRUE)
-#   
-#   compileModelMPI(model = file.path(outDir, modelName), stanDir = stanDir, nslaves = nslaves)
-#   
-#   ##  mpi.spawn.Rslaves(nslaves = nslaves)
-#   RNGkind("L'Ecuyer-CMRG")
-#   mc.reset.stream()
-#   
-#   chains <- 1:nChains
-#   startTime <- Sys.time()
-#   # given that I only have 6 functional cores on laptop, using mclapply won't help much
-#   mclapply(chains,
-#          function(chain, model, data, iter, warmup, thin, init) {
-#            outDir <- file.path(outDir, chain)
-#            dir.create(outDir)
-#            with(data, stan_rdump(ls(data), file = file.path(outDir, "data.R")))
-#            inits <- init()
-#            with(inits, stan_rdump(ls(inits), file = file.path(outDir, "init.R")))
-#            ## run without MPI parallelization
-#            # runModel(model = model, data = file.path(outDir, "data.R"),
-#            #          iter = iter, warmup = warmup, thin = thin,
-#            #          init = file.path(outDir, "init.R"),
-#            #          seed = sample(1:999999, 1),
-#            #          chain = chain)
-#            ## run with MPI parallelization
-#            runModelMPI(model = model, data = file.path(outDir, "data.R"),
-#                        iter = iter, warmup = warmup, thin = thin,
-#                        save_warmup = 0,
-#                        init = file.path(outDir, "init.R"),
-#                        seed = sample(1:999999, 1),
-#                        #adapt_delta = 0.95, stepsize = 0.01,
-#                        refresh = 1,
-#                        chain = chain,
-#                        nslaves = nslaves)
-#          },
-#          model = file.path(outDir, modelName),
-#          data = data,
-#          init = init,
-#          iter = nIter, warmup = nBurnin, thin = nThin,
-#          mc.cores = min(nChains, detectCores()))
-#   endTime <- Sys.time()
-#   elapsedTime <- endTime - startTime
-#   elapsedTime
-#   
-#   fit <- read_stan_csv(file.path(outDir, paste0(modelName, chains, ".csv")))
-#   save(fit, file = file.path(outDir, paste(modelName, "Fit.Rsave", sep = "")))
-# }else{
-#   load(file.path(outDir, paste(modelName, "Fit.Rsave", sep = "")))
-# }
 
 ################################################################################
 ################################################################################
@@ -269,11 +217,12 @@ if(fitModel){
 
 if(runAnalysis){
   
+  # load fit object
+  fit <- readRDS(file.path(outDir, paste0(modelName, ".fit.RDS")))
+  
   myTheme <- theme(text = element_text(size = 12), axis.text = element_text(size = 12))
   
   parametersToPlot <- setdiff(parametersToPlot, "rho")
-  outputFiles <- paste0(file.path(outDir,modelName), sprintf("%01d.csv", 1:nChains))
-  fit <- as_cmdstan_fit(outputFiles)
   subset.pars <- subset_draws(fit$draws(), variable=parametersToPlot)
   
   ## diagnostics ##
@@ -315,7 +264,7 @@ if(runAnalysis){
                        dir = figDir, stem = paste(modelName, "MCMCDiagnostics", sep = "-"),
                        width = 10, height = 8,
                        onefile = TRUE)
-
+  
   plotFile_pairs <- mrggsave(list(plot_pairs),
                              scriptName,
                              dir = figDir, stem = paste(modelName, "MCMCDiagnostics-Corrs", sep = "-"),
@@ -325,17 +274,9 @@ if(runAnalysis){
   #############
   
   ## predictive checks ##
-  ## get data
-  data <- read_rdump(file.path(outDir, "1", "data.R"))
-  
   # get cobsPred and cobsCond
-  cobsCond.rep <-
-    as_draws_df(fit$draws(variables=c("cObsCond"))) %>%
-    select(starts_with("cObsCond")) %>% as.matrix()
-  
-  cobsPred.rep <-
-    as_draws_df(fit$draws(variables=c("cObsPred"))) %>%
-    select(starts_with("cObsPred")) %>% as.matrix()
+  cobsCond.rep <- as_draws_matrix(fit$draws(variables = c("cObsCond")))
+  cobsPred.rep <- as_draws_matrix(fit$draws(variables = c("cObsPred")))
   
   time <- data[["time"]]
   nSubject <- data[["nSubject"]]
@@ -443,6 +384,7 @@ if(runAnalysis){
                                                xlab = "Time (h)") +
     scale_y_continuous(trans = "log10", limits = c(0.01,100)) + theme_bw()
   
+  # individual plots
   df_cobsAll <- df_cobsCond %>%
     rename(cCond = pred) %>%
     bind_cols(df_cobsPred %>%
