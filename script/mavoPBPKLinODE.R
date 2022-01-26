@@ -41,7 +41,6 @@ invisible(dir.create(outDir,recursive=T))
 fitModel <- TRUE
 useRStan <- FALSE
 runAnalysis <- FALSE
-nslaves = 5   # number of processes (cores) per chain
 
 # load libraries
 library(tidyverse)

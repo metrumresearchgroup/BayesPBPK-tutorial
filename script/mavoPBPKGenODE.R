@@ -41,7 +41,7 @@ invisible(dir.create(outDir,recursive=T))
 fitModel <- TRUE
 useRStan <- FALSE
 runAnalysis <- FALSE
-nslaves = 5   # number of processes (cores) per chain
+nslaves <- 20   # number of processes (cores) per chain
 
 # load libraries
 library(tidyverse)
@@ -168,8 +168,6 @@ nPost <- 250 ## Number of post-burn-in samples per chain after thinning
 nBurn <- 250 ## Number of burn-in samples per chain after thinning
 nThin <- 1
 
-nCores <- 5
-
 nIter <- (nPost + nBurn) * nThin
 nBurnin <- nBurn * nThin
 
@@ -178,7 +176,6 @@ if(fitModel){
   file.copy(file.path(modelDir, paste0(modelName, ".stan")), 
             file.path(outDir, paste0(modelName, ".stan")), overwrite = TRUE)
   
-  #mod <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")))
   # locally
   mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")), 
                         cpp_options=list("TORSTEN_MPI=1","TBB_CXX_TYPE=clang"),force_recompile=TRUE,quiet=FALSE)
@@ -186,13 +183,6 @@ if(fitModel){
   # metworx
   # mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")), 
   #                       cpp_options=list("TORSTEN_MPI=1","TBB_CXX_TYPE=gcc","CXXFLAGS += -isystem /usr/include/mpich"),force_recompile=TRUE,quiet=FALSE)
-  # 
-  # fit <- mod$sample(data = data, chains = nChains, init = init,
-  #                   parallel_chains = nChains,
-  #                   iter_warmup = nBurn, iter_sampling = nPost,
-  #                   seed = sample(1:999999, 1), adapt_delta = 0.8,
-  #                   refresh = 10,
-  #                   output_dir = outDir)
   
   fit <- mod$sample_mpi(data = data, chains = 1, init = init,
                     #parallel_chains = nChains,
@@ -201,7 +191,7 @@ if(fitModel){
                     refresh = 10,
                     output_dir = outDir,
                     # the -l option will tag each output line with MPI process id
-                    mpi_args = list("n" = nCores, "-l" = NULL))
+                    mpi_args = list("n" = nslaves, "-l" = NULL))
   
   fit$save_object(file.path(outDir, paste0(modelName, ".fit.RDS")))
 }else{
