@@ -177,12 +177,12 @@ if(fitModel){
             file.path(outDir, paste0(modelName, ".stan")), overwrite = TRUE)
   
   # locally
-  mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")), 
-                        cpp_options=list("TORSTEN_MPI=1","TBB_CXX_TYPE=clang"),force_recompile=TRUE,quiet=FALSE)
+  # mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")), 
+  #                       cpp_options=list("TORSTEN_MPI=1","TBB_CXX_TYPE=clang"),force_recompile=TRUE,quiet=FALSE)
   
   # metworx
-  # mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")), 
-  #                       cpp_options=list("TORSTEN_MPI=1","TBB_CXX_TYPE=gcc","CXXFLAGS += -isystem /usr/include/mpich"),force_recompile=TRUE,quiet=FALSE)
+  mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")),
+                        cpp_options=list(TORSTEN_MPI=1,TBB_CXX_TYPE="gcc"),force_recompile=TRUE,quiet=FALSE)
   
   fit <- mod$sample_mpi(data = data, chains = 1, init = init,
                     #parallel_chains = nChains,
