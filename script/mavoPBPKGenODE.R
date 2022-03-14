@@ -41,7 +41,7 @@ invisible(dir.create(outDir,recursive=T))
 fitModel <- TRUE
 useRStan <- FALSE
 runAnalysis <- FALSE
-nslaves <- 20   # number of processes (cores) per chain
+nslaves <- 5   # number of processes (cores) per chain
 
 # load libraries
 library(tidyverse)
@@ -178,11 +178,11 @@ if(fitModel){
   
   # locally
   mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")), 
-                        cpp_options=list("TORSTEN_MPI=1","TBB_CXX_TYPE=clang"),force_recompile=TRUE,quiet=FALSE)
+                        cpp_options=list(TORSTEN_MPI=1,TBB_CXX_TYPE="clang"),force_recompile=TRUE,quiet=FALSE)
   
   # metworx
   # mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")), 
-  #                       cpp_options=list("TORSTEN_MPI=1","TBB_CXX_TYPE=gcc","CXXFLAGS += -isystem /usr/include/mpich"),force_recompile=TRUE,quiet=FALSE)
+  #                       cpp_options=list(TORSTEN_MPI=1,TBB_CXX_TYPE="gcc","CXXFLAGS += -isystem /usr/include/mpich"),force_recompile=TRUE,quiet=FALSE)
   
   fit <- mod$sample_mpi(data = data, chains = 1, init = init,
                     #parallel_chains = nChains,
