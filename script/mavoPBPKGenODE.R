@@ -184,7 +184,7 @@ if(fitModel){
   # mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")), 
   #                       cpp_options=list(TORSTEN_MPI=1,TBB_CXX_TYPE="gcc","CXXFLAGS += -isystem /usr/include/mpich"),force_recompile=TRUE,quiet=FALSE)
   
-  fit <- mod$sample_mpi(data = data, chains = 1, init = init,
+  fit <- mod$sample_mpi(data = data, chains = nChains, init = init,
                     #parallel_chains = nChains,
                     iter_warmup = nBurn, iter_sampling = nPost,
                     seed = sample(1:999999, 1), adapt_delta = 0.8,
