@@ -41,7 +41,7 @@ invisible(dir.create(outDir,recursive=T))
 fitModel <- TRUE
 useRStan <- FALSE
 runAnalysis <- FALSE
-nslaves <- 20   # number of processes (cores) per chain
+nslaves <- 2   # number of processes (cores) per chain
 
 # load libraries
 library(tidyverse)
@@ -59,7 +59,7 @@ library(cowplot)
 source(file.path(toolsDir, "stanTools.R"))
 source(file.path(toolsDir, "functions.R"))
 if(!useRStan) source(file.path(toolsDir, "cmdStanTools.R"))
-set_cmdstan_path(stanDir)
+set_cmdstan_path("/data/Torsten/cmdstan")
 
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
@@ -177,25 +177,17 @@ if(fitModel){
             file.path(outDir, paste0(modelName, ".stan")), overwrite = TRUE)
   
   # locally
-  mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")), 
-                        cpp_options=list("TORSTEN_MPI=1","TBB_CXX_TYPE=clang"),force_recompile=TRUE,quiet=FALSE)
+    ## mod  <- cmdstan_model(file.path("/data/BayesPBPK-tutorial_2/model", paste0(modelName, ".stan")), 
+    ##                       cpp_options=list(TORSTEN_MPI=1,TBB_CXX_TYPE="gcc"),force_recompile=TRUE,quiet=FALSE)
   
   # metworx
-  # mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")), 
-  #                       cpp_options=list("TORSTEN_MPI=1","TBB_CXX_TYPE=gcc","CXXFLAGS += -isystem /usr/include/mpich"),force_recompile=TRUE,quiet=FALSE)
+   mod  <- cmdstan_model(modelFile,
+                         cpp_options=list(TORSTEN_MPI=1,CXX="/data/openmpi/bin/mpicxx",TBB_CXX_TYPE="gcc"),force_recompile=TRUE,quiet=FALSE)
   
-  fit <- mod$sample_mpi(data = data, chains = 1, init = init,
-                    #parallel_chains = nChains,
-                    iter_warmup = nBurn, iter_sampling = nPost,
-                    seed = sample(1:999999, 1), adapt_delta = 0.8,
-                    refresh = 10,
-                    output_dir = outDir,
-                    # the -l option will tag each output line with MPI process id
-                    mpi_args = list("n" = nslaves, "-l" = NULL))
-  
-  fit$save_object(file.path(outDir, paste0(modelName, ".fit.RDS")))
+fit <- mod$sample_mpi(data=data,chains=1, mpi_cmd="/data/openmpi/bin/mpiexec",init=init,iter_warmup=250, iter_sampling=250, seed=3829, adapt_delta=0.9, refresh=10, mpi_args=list("n"=4,"-tag-output"=NULL))
+
 }else{
-  fit <- readRDS(file.path(outDir, paste0(modelName, ".fit.RDS")))
+    
 }
 
 ################################################################################
@@ -205,221 +197,3 @@ if(fitModel){
 ################################## Analysis ####################################
 ################################################################################
 
-if(runAnalysis){
-  
-  # load fit object
-  fit <- readRDS(file.path(outDir, paste0(modelName, ".fit.RDS")))
-  
-  myTheme <- theme(text = element_text(size = 12), axis.text = element_text(size = 12))
-  
-  parametersToPlot <- setdiff(parametersToPlot, "rho")
-  subset.pars <- subset_draws(fit$draws(), variable=parametersToPlot)
-  
-  ## diagnostics ##
-  # summary
-  # fitSumm <- fit$summary()  # this will grab all model outputs
-  fitSummParams <- fit$summary(variables = parametersToPlot)
-  write.csv(fitSummParams, file = file.path(tabDir, paste(modelName, "ParameterTable.csv", sep = "-")), quote = F, row.names = F)
-  
-  # density
-  plot_mcmcDensityByChain <- mcmc_dens_overlay(subset.pars, facet_args=list(ncol=2))+facet_text(size=10)+theme(axis.text=element_text(size=10))
-  plot_mcmcDensity <- mcmc_dens(subset.pars, facet_args=list(ncol=4))+facet_text(size=10)+theme(axis.text=element_text(size=10))
-  
-  # rhat
-  rhats <- bayesplot::rhat(fit, pars = parametersToPlot)
-  plot_rhat <- mcmc_rhat(rhats) + yaxis_text() + myTheme
-  
-  # neff
-  ratios1 <- bayesplot::neff_ratio(fit, pars = parametersToPlot)
-  plot_neff <- mcmc_neff(ratios1) + yaxis_text() + myTheme
-  
-  # history
-  draws_array <- fit$draws()
-  plot_mcmcHistory <- mcmc_trace(draws_array, pars = c(parametersToPlot[1:7], "omega[1]"), facet_args = list(ncol = 2))
-  
-  # correlation
-  plot_pairs <- mcmc_pairs(draws_array, pars = c(parametersToPlot[1:7], "omega[1]"), off_diag_args = list(size = 1.5), diag_fun = "dens")
-  
-  # join history and densities
-  plot_historyDensity <- plot_grid(plot_mcmcHistory, plot_mcmcDensityByChain, ncol = 2, labels = c("A","B"))
-  
-  # save
-  plotFile <- mrggsave(list(plot_rhat,
-                            plot_neff,
-                            plot_mcmcHistory,
-                            plot_mcmcDensityByChain,
-                            plot_mcmcDensity,
-                            plot_historyDensity),
-                       scriptName,
-                       dir = figDir, stem = paste(modelName, "MCMCDiagnostics", sep = "-"),
-                       width = 10, height = 8,
-                       onefile = TRUE)
-  
-  plotFile_pairs <- mrggsave(list(plot_pairs),
-                             scriptName,
-                             dir = figDir, stem = paste(modelName, "MCMCDiagnostics-Corrs", sep = "-"),
-                             width = 14, height = 14,
-                             onefile = TRUE)
-  
-  #############
-  
-  ## predictive checks ##
-  # get cobsPred and cobsCond
-  cobsCond.rep <- as_draws_matrix(fit$draws(variables = c("cObsCond")))
-  cobsPred.rep <- as_draws_matrix(fit$draws(variables = c("cObsPred")))
-  
-  time <- data[["time"]]
-  nSubject <- data[["nSubject"]]
-  nObs  <- data[["nObs"]]
-  iObs  <- data[["iObs"]]
-  cObs <- data[["cObs"]]
-  nti <- data[["nti"]]
-  recByID <- unlist(sapply(1:nSubject, function(i){rep(i, nti[i])}))
-  obsByID <- recByID[iObs]
-  
-  # plot_ppc_cobsCond <- ppc_ribbon_grouped(y=data[["cObs"]], yrep=cobsCond.rep, x=time[iObs],
-  #                                         group=obsByID) + scale_x_continuous(name="Time (h)") +
-  #   scale_y_continuous(name="Mavoglurant concentration (ng/mL)", trans = "log10") + theme(axis.text=element_text(size=10))
-  # 
-  plot_ppc_cobsPred <- ppc_ribbon_grouped(y=data[["cObs"]], yrep=cobsPred.rep, x=time[iObs],
-                                          group=obsByID) + scale_x_continuous(name="Time (h)") +
-    scale_y_continuous(name="Mavoglurant concentration (ng/mL)", trans = "log10") + theme(axis.text=element_text(size=10))
-  
-  # ppc summary plot
-  # get observed data
-  df_cobs <- tibble(ID = obsByID,
-                    time = time[iObs],
-                    obs = cObs) %>%
-    left_join(dat %>% mutate(ID2 = ID, ID = dense_rank(ID)) %>% select(ID, ID2, DOSE), by = "ID") %>%
-    distinct() %>%
-    mutate(dnobs = obs/DOSE)
-  
-  # get predictions
-  df_cobsCond <- as_tibble(t(cobsCond.rep)) %>%
-    mutate(ID = obsByID, time = time[iObs]) %>%
-    gather(sim, pred, -ID, -time) %>%
-    mutate(sim = as.integer(gsub("V","",sim))) %>%
-    select(sim, ID, time, pred) %>%
-    left_join(df_cobs %>% select(ID, ID2, DOSE), by = "ID") %>%
-    distinct() %>%
-    mutate(dnpred = pred/DOSE)
-  
-  df_cobsPred <- as_tibble(t(cobsPred.rep)) %>%
-    mutate(ID = obsByID, time = time[iObs]) %>%
-    gather(sim, pred, -ID, -time) %>%
-    mutate(sim = as.integer(gsub("V","",sim))) %>%
-    select(sim, ID, time, pred) %>%
-    left_join(df_cobs %>% mutate(ID2 = ID, ID = dense_rank(ID)) %>% select(ID, ID2, DOSE), by = "ID") %>%
-    distinct() %>%
-    mutate(dnpred = pred/DOSE)
-  
-  plot_ppc_cobsPred_summ_byDose <- vpc(sim = df_cobsPred,
-                                       obs = df_cobs,                               # supply simulation and observation dataframes
-                                       obs_cols = list(
-                                         id = "ID2",
-                                         dv = "obs",                             # these column names are the default,
-                                         idv = "time"),                         # update these if different.
-                                       sim_cols = list(
-                                         id = "ID2",
-                                         dv = "pred",
-                                         idv = "time",
-                                         sim = "sim"),
-                                       stratify = "DOSE",
-                                       bins = c(0, 2, 4, 6, 8, 10, 20, 30, 40, 50),     # specify bin separators manually
-                                       pi = c(0.05, 0.95),                      # prediction interval simulated data to show
-                                       ci = c(0.025, 0.975),                      # confidence intervals to show
-                                       pred_corr = FALSE,                       # perform prediction-correction?
-                                       show = list(obs_dv = TRUE),              # plot observations?
-                                       ylab = "Mavoglurant concentration (ng/mL)",
-                                       xlab = "Time (h)") +
-    scale_y_continuous(trans = "log10") + theme_bw()
-  
-  plot_ppc_cobsPred_summ_total <- vpc(sim = df_cobsPred,
-                                      obs = df_cobs,                               # supply simulation and observation dataframes
-                                      obs_cols = list(
-                                        id = "ID2",
-                                        dv = "obs",                             # these column names are the default,
-                                        idv = "time"),                         # update these if different.
-                                      sim_cols = list(
-                                        id = "ID2",
-                                        dv = "pred",
-                                        idv = "time",
-                                        sim = "sim"),
-                                      bins = c(0, 2, 4, 6, 8, 10, 20, 30, 40, 50),     # specify bin separators manually
-                                      pi = c(0.05, 0.95),                      # prediction interval simulated data to show
-                                      ci = c(0.025, 0.975),                      # confidence intervals to show
-                                      pred_corr = FALSE,                       # perform prediction-correction?
-                                      show = list(obs_dv = TRUE),              # plot observations?
-                                      ylab = "Mavoglurant concentration (ng/mL)",
-                                      xlab = "Time (h)") +
-    scale_y_continuous(trans = "log10") + theme_bw()
-  
-  plot_ppc_cobsPred_summ_total_dosenorm <- vpc(sim = df_cobsPred,
-                                               obs = df_cobs,                               # supply simulation and observation dataframes
-                                               obs_cols = list(
-                                                 id = "ID2",
-                                                 dv = "dnobs",                             # these column names are the default,
-                                                 idv = "time"),                         # update these if different.
-                                               sim_cols = list(
-                                                 id = "ID2",
-                                                 dv = "dnpred",
-                                                 idv = "time",
-                                                 sim = "sim"),
-                                               bins = c(0, 2, 4, 6, 8, 10, 20, 30, 40, 50),     # specify bin separators manually
-                                               pi = c(0.05, 0.95),                      # prediction interval simulated data to show
-                                               ci = c(0.025, 0.975),                      # confidence intervals to show
-                                               pred_corr = FALSE,                       # perform prediction-correction?
-                                               show = list(obs_dv = TRUE),              # plot observations?
-                                               ylab = "Mavoglurant dose-normalized concentration (ng/mL/mg)",
-                                               xlab = "Time (h)") +
-    scale_y_continuous(trans = "log10", limits = c(0.01,100)) + theme_bw()
-  
-  # individual plots
-  df_cobsAll <- df_cobsCond %>%
-    rename(cCond = pred) %>%
-    bind_cols(df_cobsPred %>%
-                select(cPred = pred)) 
-  
-  df_cobsAll_summ <- df_cobsAll %>%
-    group_by(ID, time) %>%
-    mutate(loCond = lo(cCond),
-           medCond = med(cCond),
-           hiCond = hi(cCond),
-           loPred = lo(cPred),
-           medPred = med(cPred),
-           hiPred = hi(cPred)) %>%
-    slice(1) %>%
-    ungroup()
-  
-  # join with observed
-  df_simobs <- bind_cols(df_cobsAll_summ, df_cobs %>% select(cObs = obs))
-  
-  # plot
-  plot_ind <- ggplot(data=df_simobs, aes(x=time)) +
-    geom_point(aes(y=cObs)) +
-    geom_line(aes(y=medCond, color="Individual")) +
-    geom_ribbon(aes(ymin = loCond, ymax=hiCond, fill="Individual"), alpha=0.2) +
-    geom_line(aes(y=medPred, color="Population")) +
-    geom_ribbon(aes(ymin = loPred, ymax=hiPred, fill="Population"), alpha=0.2) +
-    facet_wrap(~ID2, ncol = 5) +
-    scale_y_continuous(trans="log10") +
-    scale_color_manual(name="", values = c("Individual" = "red", "Population" = "blue")) +
-    scale_fill_manual(name="", values = c("Individual" = "red", "Population" = "blue")) +
-    labs(x="Time (h)", y="Mavoglurant concentration (ng/mL)") +
-    theme_bw() +
-    theme(legend.position = "top",
-          legend.text = element_text(size = 15),
-          axis.title = element_text(size = 15))
-  
-  # save
-  plotFile <- mrggsave(list(plot_ppc_cobsPred, 
-                            plot_ppc_cobsPred_summ_total,
-                            plot_ppc_cobsPred_summ_total_dosenorm,
-                            plot_ppc_cobsPred_summ_byDose,
-                            plot_ind),
-                       scriptName,
-                       dir = figDir, stem = paste(modelName,"PPC", sep = "-"),
-                       onefile = TRUE,
-                       width=10, height=8)
-  
-}
