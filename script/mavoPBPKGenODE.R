@@ -41,7 +41,7 @@ invisible(dir.create(outDir,recursive=T))
 fitModel <- TRUE
 useRStan <- FALSE
 runAnalysis <- FALSE
-nslaves <- 20   # number of processes (cores) per chain
+nslaves <- 5   # number of processes (cores) per chain
 
 # load libraries
 library(tidyverse)
@@ -177,14 +177,23 @@ if(fitModel){
             file.path(outDir, paste0(modelName, ".stan")), overwrite = TRUE)
   
   # locally
+<<<<<<< HEAD
   # mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")), 
   #                       cpp_options=list("TORSTEN_MPI=1","TBB_CXX_TYPE=clang"),force_recompile=TRUE,quiet=FALSE)
   
   # metworx
   mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")),
                         cpp_options=list(TORSTEN_MPI=1,TBB_CXX_TYPE="gcc"),force_recompile=TRUE,quiet=FALSE)
+=======
+  mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")), 
+                        cpp_options=list(TORSTEN_MPI=1,TBB_CXX_TYPE="clang"),force_recompile=TRUE,quiet=FALSE)
   
-  fit <- mod$sample_mpi(data = data, chains = 1, init = init,
+  # metworx
+  # mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")), 
+  #                       cpp_options=list(TORSTEN_MPI=1,TBB_CXX_TYPE="gcc","CXXFLAGS += -isystem /usr/include/mpich"),force_recompile=TRUE,quiet=FALSE)
+>>>>>>> 473930c7567c4c617e892f51dff6421abdfc2843
+  
+  fit <- mod$sample_mpi(data = data, chains = nChains, init = init,
                     #parallel_chains = nChains,
                     iter_warmup = nBurn, iter_sampling = nPost,
                     seed = sample(1:999999, 1), adapt_delta = 0.8,
