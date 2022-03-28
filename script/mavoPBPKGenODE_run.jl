@@ -1,4 +1,5 @@
 cd(@__DIR__)
+cd("..")
 using Pkg; Pkg.activate(".")
 using CSV, DataFramesMeta, Chain, Random
 using OrdinaryDiffEq, DiffEqCallbacks, Turing, Distributions, CategoricalArrays
@@ -24,7 +25,7 @@ dat = dat_orig[dat_orig.ID .<= 812,:]
 dat_obs = dat[dat.MDV .== 0,:]  # grab first 20 subjects ; remove missing obs
 
 # load model
-include(joinpath(modDir, string(modName, ".jl")))
+include(joinpath("..", modDir, string(modName, ".jl")))
 
 # conditions
 nSubject = length(unique(dat.ID))
@@ -142,7 +143,7 @@ mod = fitPBPK(dat_obs.DV, prob, nSubject, rates, times, wts, cbs, VVBs, BP)
 #@time mcmcchains_prior = sample(mod, Prior(), MCMCThreads(), 250, 4)  # parallel
 
 ## save mcmcchains
-#write(joinpath(modPath, string(modName, "chains.jls")), mcmcchains)
+write(joinpath("..", modPath, string(modName, "chains.jls")), mcmcchains)
 
 ##load saved chains
 #mcmcchains = read(joinpath(modPath, string(modName, "chains.jls")), Chains)
