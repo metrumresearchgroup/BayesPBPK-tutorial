@@ -8,7 +8,7 @@ using Plots, StatsPlots, MCMCChains
 using Gadfly
 import Cairo, Fontconfig
 
-Random.seed!(1234)
+Random.seed!(123456)
 
 # paths
 modDir = "model"
@@ -127,7 +127,7 @@ savefig(plot_sens, joinpath(figPath, "sensitivity.pdf"))
 
     # likelihood
     for i = 1:length(predicted)
-        data[i] ~ LogNormal(log.(predicted[i]), σ)
+        data[i] ~ LogNormal(log.(max(predicted[i], 1e-12)), σ)
     end
 end
 
@@ -139,11 +139,13 @@ mod = fitPBPK(dat_obs.DV, prob, nSubject, rates, times, wts, cbs, VVBs, BP)
 #@time mcmcchains_prior = mapreduce(c -> sample(mod, Prior(), 250), chainscat, 1:4)  # serial
 
 ## multithreading
-@time mcmcchains = sample(mod, NUTS(250,.8), MCMCThreads(), 250, 4)  # parallel
-#@time mcmcchains_prior = sample(mod, Prior(), MCMCThreads(), 250, 4)  # parallel
+nsamples = 250
+@time mcmcchains = sample(mod, NUTS(nsamples,.8), MCMCThreads(), nsamples, 4)
+#@time mcmcchains = sample(mod, NUTS(nsamples,.8), MCMCThreads(), nsamples, 4, progress = true, init_theta = [[0.25,exp(7.1),exp(1.1),exp(0.3),exp(2.0),exp(0.03),exp(0.3),0.25];repeat([0.0],20)])
+#@time mcmcchains_prior = sample(mod, Prior(), MCMCThreads(), nsamples, 4)  # parallel
 
 ## save mcmcchains
-write(joinpath("..", modPath, string(modName, "chains.jls")), mcmcchains)
+write(joinpath(modPath, string(modName, "chains.jls")), mcmcchains)
 
 ##load saved chains
 #mcmcchains = read(joinpath(modPath, string(modName, "chains.jls")), Chains)
