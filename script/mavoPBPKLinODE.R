@@ -63,7 +63,7 @@ set_cmdstan_path(stanDir)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
-set.seed(11191962) ## not required but assures repeatable results
+set.seed(1111) ## not required but assures repeatable results
 
 ################################################################################
 ################################# Prepare data #################################
