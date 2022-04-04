@@ -324,7 +324,8 @@ if(runAnalysis){
                                        show = list(obs_dv = TRUE),              # plot observations?
                                        ylab = "Mavoglurant concentration (ng/mL)",
                                        xlab = "Time (h)") +
-    scale_y_continuous(trans = "log10") + theme_bw()
+    scale_y_continuous(trans = "log10") + theme_bw() + theme(legend.text = element_text(size = 15),
+                                                               axis.title = element_text(size = 15))
   
   plot_ppc_cobsPred_summ_total <- vpc(sim = df_cobsPred,
                                       obs = df_cobs,                               # supply simulation and observation dataframes
@@ -344,7 +345,8 @@ if(runAnalysis){
                                       show = list(obs_dv = TRUE),              # plot observations?
                                       ylab = "Mavoglurant concentration (ng/mL)",
                                       xlab = "Time (h)") +
-    scale_y_continuous(trans = "log10") + theme_bw()
+    scale_y_continuous(trans = "log10") + theme_bw() + theme(legend.text = element_text(size = 15),
+                                                             axis.title = element_text(size = 15))
   
   plot_ppc_cobsPred_summ_total_dosenorm <- vpc(sim = df_cobsPred,
                                                obs = df_cobs,                               # supply simulation and observation dataframes
@@ -364,7 +366,8 @@ if(runAnalysis){
                                                show = list(obs_dv = TRUE),              # plot observations?
                                                ylab = "Mavoglurant dose-normalized concentration (ng/mL/mg)",
                                                xlab = "Time (h)") +
-    scale_y_continuous(trans = "log10", limits = c(0.01,100)) + theme_bw()
+    scale_y_continuous(trans = "log10", limits = c(0.01,100)) + theme_bw() + theme(legend.text = element_text(size = 15),
+                                                                                   axis.title = element_text(size = 15))
   
   # individual plots
   df_cobsAll <- df_cobsCond %>%
