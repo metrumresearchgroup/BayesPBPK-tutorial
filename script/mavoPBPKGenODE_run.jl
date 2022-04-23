@@ -187,7 +187,7 @@ pars = summ[1:8,1]
 dens_plots = []
 for i in 1:8; p = density(p_post_mean[:,i], title=pars[i], label="Posterior"); density!(p_prior_mean[:,i], label="Prior"); push!(dens_plots, p); end
 
-dens_plots[1] = Plots.plot(dens_plots[1], ylims=(0,25), xlims=(0.25,0.4))
+dens_plots[1] = Plots.plot(dens_plots[1], xlims=(0.0,0.6))
 
 plot_dens = Plots.plot(dens_plots[1],
                         dens_plots[2],
