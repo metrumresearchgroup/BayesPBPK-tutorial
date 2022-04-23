@@ -142,10 +142,11 @@ mod = fitPBPK(dat_obs.DV, prob, nSubject, rates, times, wts, cbs, VVBs, BP)
 nsampl = 250
 @time mcmcchains = sample(mod, NUTS(nsampl,.8), MCMCThreads(), nsampl, 4)
 #@time mcmcchains = sample(mod, NUTS(nsampl,.8), MCMCThreads(), nsampl, 4, progress = true, init_theta = [[0.25,exp(7.1),exp(1.1),exp(0.3),exp(2.0),exp(0.03),exp(0.3),0.25];repeat([0.0],20)])
-#@time mcmcchains_prior = sample(mod, Prior(), MCMCThreads(), nsampl, 4)  # parallel
+@time mcmcchains_prior = sample(mod, Prior(), MCMCThreads(), nsampl, 4)  # parallel
 
 ## save mcmcchains
 write(joinpath(modPath, string(modName, "chains.jls")), mcmcchains)
+write(joinpath(modPath, string(modName, "chains_prior.jls")), mcmcchains_prior)
 
 ##load saved chains
 #mcmcchains = read(joinpath(modPath, string(modName, "chains.jls")), Chains)
@@ -171,6 +172,35 @@ plot_chains1 = StatsPlots.plot(mcmcchains[:,1:4,:])
 plot_chains2 = StatsPlots.plot(mcmcchains[:,5:8,:])
 plot_chains = Plots.plot(plot_chains1, plot_chains2, layout = (1,2))
 savefig(plot_chains, joinpath(figPath, "MCMCTrace.pdf"))
+
+## density plots
+p_post = zeros(nsampl, 8, 4)
+p_prior = deepcopy(p_post)
+
+for i in 1:4; p_post[:,:,i] = Array(mcmcchains[:,1:8,1]); end
+for i in 1:4; p_prior[:,:,i] = Array(mcmcchains_prior[:,1:8,1]); end
+
+p_post_mean = mean(p_post, dims=3)[:,:,1]
+p_prior_mean = mean(p_prior, dims=3)[:,:,1]
+
+pars = summ[1:8,1]
+dens_plots = []
+for i in 1:8; p = density(p_post_mean[:,i], title=pars[i], label="Posterior"); density!(p_prior_mean[:,i], label="Prior"); push!(dens_plots, p); end
+
+dens_plots[1] = Plots.plot(dens_plots[1], ylims=(0,25), xlims=(0.25,0.4))
+
+plot_dens = Plots.plot(dens_plots[1],
+                        dens_plots[2],
+                        dens_plots[3],
+                        dens_plots[4],
+                        dens_plots[5],
+                        dens_plots[6],
+                        dens_plots[7],
+                        dens_plots[8], 
+                        layout=grid(4,2),
+                        size = (650,650))
+savefig(plot_dens, joinpath(figPath, "DensPlots.pdf"))
+
 
 #=
 ## rhat
