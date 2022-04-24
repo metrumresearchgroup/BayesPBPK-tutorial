@@ -135,14 +135,15 @@ mod = fitPBPK(dat_obs.DV, prob, nSubject, rates, times, wts, cbs, VVBs, BP)
 
 # run 
 ## serial 
-#@time mcmcchains = mapreduce(c -> sample(mod, NUTS(250,.8), 250), chainscat, 1:4)  # serial
+#@time mcmcchains = mapreduce(c -> sample(mod, NUTS(250,adapt_delta), 250), chainscat, 1:4)  # serial
 #@time mcmcchains_prior = mapreduce(c -> sample(mod, Prior(), 250), chainscat, 1:4)  # serial
 
 ## multithreading
 nsampl = 250
-@time mcmcchains = sample(mod, NUTS(nsampl,.8), MCMCThreads(), nsampl, 4)
-#@time mcmcchains = sample(mod, NUTS(nsampl,.8), MCMCThreads(), nsampl, 4, progress = true, init_theta = [[0.25,exp(7.1),exp(1.1),exp(0.3),exp(2.0),exp(0.03),exp(0.3),0.25];repeat([0.0],20)])
-@time mcmcchains_prior = sample(mod, Prior(), MCMCThreads(), nsampl, 4)  # parallel
+nchains = 4
+adapt_delta = .8
+@time mcmcchains = sample(mod, NUTS(nsampl,adapt_delta), MCMCThreads(), nsampl, nchains)
+@time mcmcchains_prior = sample(mod, Prior(), MCMCThreads(), nsampl, nchains)  # parallel
 
 ## save mcmcchains
 write(joinpath(modPath, string(modName, "chains.jls")), mcmcchains)
