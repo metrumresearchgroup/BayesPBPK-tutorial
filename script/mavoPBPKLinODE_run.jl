@@ -299,6 +299,7 @@ for j in 1:nrow(df_params)
     predicted = []
 
     for i in 1:nSubject
+        tmp_rate[15] = rates[i]
         ps = [CLintᵢ[i], KbBR, KbMU, KbAD, KbBO, KbRB, wts[i]]
         K = PBPK(ps)
         u0_eoi = inv(K)*ExponentialAction.expv(durs[i], K, tmp_rate) - inv(K)*tmp_rate
