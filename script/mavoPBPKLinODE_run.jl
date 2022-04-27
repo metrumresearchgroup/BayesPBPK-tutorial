@@ -76,18 +76,18 @@ ends = deepcopy(sum_lens)
 
     ps_tmp = [CLintᵢ[1], KbBR, KbMU, KbAD, KbBO, KbRB, wts[1]]
     K_tmp = PBPK(ps_tmp)
-    u0_eoi_tmp = inv(K_tmp)*ExponentialAction.expv(durs[1], K_tmp, tmp_rate) - inv(K_tmp)*tmp_rate
+    u0_eoi_tmp = inv(K_tmp)*ExponentialAction.expv(durs[1], K_tmp, tmp_rate, tol=1e-6) - inv(K_tmp)*tmp_rate
     ut = zeros(Base.promote_eltype(times[1], K_tmp, u0_eoi_tmp), length(u0_eoi_tmp), length(data))
 
     for i in 1:nSubject
         tmp_rate[15] = rates[i]
         ps = [CLintᵢ[i], KbBR, KbMU, KbAD, KbBO, KbRB, wts[i]]
         K = PBPK(ps)
-        u0_eoi = inv(K)*ExponentialAction.expv(durs[i], K, tmp_rate) - inv(K)*tmp_rate
+        u0_eoi = inv(K)*ExponentialAction.expv(durs[i], K, tmp_rate, tol=1e-6) - inv(K)*tmp_rate
 
         # get matrix exponential for states after eoi so reset times as such
         times_reset = times[i] .- durs[i]
-        ut[:,starts[i]:ends[i]] = hcat(ExponentialAction.expv_sequence(times_reset, K, u0_eoi)...)
+        ut[:,starts[i]:ends[i]] = hcat(ExponentialAction.expv_sequence(times_reset, K, u0_eoi, tol=1e-6)...)
 
         tmp_sol = ut[15,starts[i]:ends[i]] ./ (VVBs[i]*BP/1000.0)
         append!(predicted, tmp_sol)
@@ -96,7 +96,7 @@ ends = deepcopy(sum_lens)
     # update the first two records for first subject that took place before eoi
     tmp_rate_1 = zeros(ncmt)
     tmp_rate_1[15] = rates[1]
-    exp_results = ExponentialAction.expv_sequence(times[1][1:2], K_tmp, tmp_rate_1)
+    exp_results = ExponentialAction.expv_sequence(times[1][1:2], K_tmp, tmp_rate_1, tol=1e-6)
     exp_results = hcat(exp_results...)
     for j in 1:2
         ut_tmp = inv(K_tmp)*exp_results[:,j] - inv(K_tmp)*tmp_rate_1
@@ -105,8 +105,8 @@ ends = deepcopy(sum_lens)
     end
 
     # likelihood
-    for i = 1:length(predicted2)
-        data[i] ~ LogNormal(log.(max(predicted2[i], 1e-12)), σ)
+    for i = 1:length(predicted)
+        data[i] ~ LogNormal(log.(max(predicted[i], 1e-12)), σ)
     end
 end
 
@@ -300,7 +300,7 @@ for j in 1:nrow(df_params)
     tmp_rate[15] = rates[1]
     ps_tmp = [CLintᵢ[1], KbBR, KbMU, KbAD, KbBO, KbRB, wts[1]]
     K_tmp = PBPK(ps_tmp)
-    u0_eoi_tmp = inv(K_tmp)*ExponentialAction.expv(durs[1], K_tmp, tmp_rate) - inv(K_tmp)*tmp_rate
+    u0_eoi_tmp = inv(K_tmp)*ExponentialAction.expv(durs[1], K_tmp, tmp_rate, tol=1e-6) - inv(K_tmp)*tmp_rate
     ut = zeros(Base.promote_eltype(times[1], K_tmp, u0_eoi_tmp), length(u0_eoi_tmp), length(dat_obs.DV))
 
     predicted = []
@@ -309,8 +309,8 @@ for j in 1:nrow(df_params)
         tmp_rate[15] = rates[i]
         ps = [CLintᵢ[i], KbBR, KbMU, KbAD, KbBO, KbRB, wts[i]]
         K = PBPK(ps)
-        u0_eoi = inv(K)*ExponentialAction.expv(durs[i], K, tmp_rate) - inv(K)*tmp_rate
-        ut[:,starts[i]:ends[i]] = hcat(ExponentialAction.expv_sequence(times[i], K, u0_eoi)...)
+        u0_eoi = inv(K)*ExponentialAction.expv(durs[i], K, tmp_rate, tol=1e-6) - inv(K)*tmp_rate
+        ut[:,starts[i]:ends[i]] = hcat(ExponentialAction.expv_sequence(times[i], K, u0_eoi, tol=1e-6)...)
 
         tmp_sol = ut[15,starts[i]:ends[i]] ./ (VVBs[i]*BP/1000.0)
         append!(predicted, tmp_sol)
@@ -318,7 +318,7 @@ for j in 1:nrow(df_params)
         # update that one record that took place before eoi
         tmp_rate_1 = zeros(ncmt)
         tmp_rate_1[15] = rates[1]
-        ut_tmp = inv(K_tmp)*ExponentialAction.expv(times[1][1], K_tmp, tmp_rate_1) - inv(K_tmp)*tmp_rate_1
+        ut_tmp = inv(K_tmp)*ExponentialAction.expv(times[1][1], K_tmp, tmp_rate_1, tol=1e-6) - inv(K_tmp)*tmp_rate_1
         sol_tmp = ut_tmp[15,1] ./ (VVBs[1]*BP/1000.0)
         predicted2 = [sol_tmp; predicted[2:end]]
     end
