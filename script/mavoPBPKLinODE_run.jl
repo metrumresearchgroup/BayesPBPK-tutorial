@@ -71,6 +71,7 @@ ends = deepcopy(sum_lens)
     # solve
     tmp_rate = zeros(ncmt)
     tmp_rate[15] = rates[1]
+    
     predicted = []
 
     ps_tmp = [CLintᵢ[1], KbBR, KbMU, KbAD, KbBO, KbRB, wts[1]]
@@ -84,18 +85,24 @@ ends = deepcopy(sum_lens)
         K = PBPK(ps)
         u0_eoi = inv(K)*ExponentialAction.expv(durs[i], K, tmp_rate) - inv(K)*tmp_rate
 
-        ut[:,starts[i]:ends[i]] = hcat(ExponentialAction.expv_sequence(times[i], K, u0_eoi)...)
+        # get matrix exponential for states after eoi so reset times as such
+        times_reset = times[i] .- durs[i]
+        ut[:,starts[i]:ends[i]] = hcat(ExponentialAction.expv_sequence(times_reset, K, u0_eoi)...)
 
         tmp_sol = ut[15,starts[i]:ends[i]] ./ (VVBs[i]*BP/1000.0)
         append!(predicted, tmp_sol)
     end
 
-    # update that one record that took place before eoi
+    # update the first two records for first subject that took place before eoi
     tmp_rate_1 = zeros(ncmt)
     tmp_rate_1[15] = rates[1]
-    ut_tmp = inv(K_tmp)*ExponentialAction.expv(times[1][1], K_tmp, tmp_rate_1) - inv(K_tmp)*tmp_rate_1
-    sol_tmp = ut_tmp[15,1] ./ (VVBs[1]*BP/1000.0)
-    predicted2 = [sol_tmp; predicted[2:end]]
+    exp_results = ExponentialAction.expv_sequence(times[1][1:2], K_tmp, tmp_rate_1)
+    exp_results = hcat(exp_results...)
+    for j in 1:2
+        ut_tmp = inv(K_tmp)*exp_results[:,j] - inv(K_tmp)*tmp_rate_1
+        sol_tmp = ut_tmp[15,1] ./ (VVBs[1]*BP/1000.0)
+        predicted[j] = sol_tmp
+    end
 
     # likelihood
     for i = 1:length(predicted2)
