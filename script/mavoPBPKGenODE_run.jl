@@ -76,11 +76,17 @@ f_globsens = function(p_sens)
     return(auc[1])
 end
 
-### bounds
+### conditions
+n = 1000
+lb = [1000.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+ub = [1500.0, 10.0, 10.0, 10.0, 10.0, 10.0]
+sampler = GlobalSensitivity.SobolSample()
+A, B = GlobalSensitivity.QuasiMonteCarlo.generate_design_matrices(n, lb, ub, sampler)
+
 bounds = [[1000.0,1500.0],[1.0,10.0],[1.0,10.0],[1.0,10.0],[1.0,10.0],[1.0,10.0]]
 
 #### Sobol
-@time s = GlobalSensitivity.gsa(f_globsens, Sobol(), bounds, N=1000)
+@time s = GlobalSensitivity.gsa(f_globsens, Sobol(), A, B)
 
 plot_sens_total = Plots.bar(["CLint","KbBR","KbMU","KbAD","KbBO","KbRB"], s.ST, title="Total Order Indices", ylabel="Index", legend=false)
 Plots.hline!([0.05], linestyle=:dash)
