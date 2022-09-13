@@ -8,7 +8,7 @@ using Plots, StatsPlots, MCMCChains
 using Gadfly
 import Cairo, Fontconfig
 
-Random.seed!(123456)
+Random.seed!(1)
 
 # paths
 modDir = "model"
