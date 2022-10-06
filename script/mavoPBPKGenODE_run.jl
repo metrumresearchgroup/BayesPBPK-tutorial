@@ -148,8 +148,10 @@ mod = fitPBPK(dat_obs.DV, prob, nSubject, rates, times, wts, cbs, VVBs, BP)
 nsampl = 250
 nchains = 4
 adapt_delta = .8
-@time mcmcchains = sample(mod, NUTS(nsampl,adapt_delta), MCMCThreads(), nsampl, nchains)
-@time mcmcchains_prior = sample(mod, Prior(), MCMCThreads(), nsampl, nchains)  # parallel
+#@time mcmcchains = sample(mod, NUTS(nsampl,adapt_delta), MCMCThreads(), nsampl, nchains)
+#@time mcmcchains_prior = sample(mod, Prior(), MCMCThreads(), nsampl, nchains)  # parallel
+@time mcmcchains = sample(mod, NUTS(nsampl,adapt_delta), MCMCSerial(), nsampl, nchains)
+@time mcmcchains_prior = sample(mod, Prior(), MCMCSerial(), nsampl, nchains)  # parallel
 
 ## save mcmcchains
 write(joinpath(modPath, string(modName, "chains.jls")), mcmcchains)
