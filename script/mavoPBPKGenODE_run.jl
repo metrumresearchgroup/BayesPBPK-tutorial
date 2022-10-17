@@ -1,16 +1,30 @@
+#=
+Version: October 7, 2022
+
+Online supplement to the tutorial: 
+
+Bayesian PBPK Modeling using R/Stan/Torsten and Julia/SciML/Turing.jl
+
+This script runs the Bayesian PBPK modeling in Julia/SciML/Turing.jl
+=#
+
+# activate pkg environment and load libraries
+# libraries are referenced in the Project.toml file
 cd(@__DIR__)
 cd("..")
-using Pkg; Pkg.activate(".")
+using Pkg; Pkg.activate(".") 
 using CSV, DataFramesMeta, Chain, Random
 using OrdinaryDiffEq, DiffEqCallbacks, Turing, Distributions, CategoricalArrays
 using GlobalSensitivity, QuadGK
 using Plots, StatsPlots, MCMCChains
+using LinearAlgebra
 using Gadfly
 import Cairo, Fontconfig
 
-Random.seed!(1)
+# set seed for reproducibility
+Random.seed!(123)
 
-# paths
+# set paths
 modDir = "model"
 modName = "mavoPBPKGenODE"
 tabDir = joinpath("deliv","table")
@@ -19,20 +33,19 @@ modPath = mkpath(joinpath(modDir, string(modName, "_jl")))
 figPath = mkpath(joinpath(figDir, string(modName, "_jl")))
 tabPath = mkpath(joinpath(tabDir, string(modName, "_jl")))
 
-# read data
+# read mavoglurant Study A2121 data; we'll only use the first 20 subjects
 dat_orig = CSV.read("data/Mavoglurant_A2121_nmpk.csv", DataFrame)
 dat = dat_orig[dat_orig.ID .<= 812,:]
 dat_obs = dat[dat.MDV .== 0,:]  # grab first 20 subjects ; remove missing obs
 
-# load model
+# load model function
 include(joinpath("..", modDir, string(modName, ".jl")))
 
-# conditions
+# set simulation conditions
 nSubject = length(unique(dat.ID))
 doses = dat.AMT[dat.EVID .== 1,:]
 rates = dat.RATE[dat.EVID .== 1,:]
 durs = doses ./ rates
-
 ncmt = 16
 u0 = zeros(ncmt)
 tspan = (0.0,maximum(dat.TIME))
@@ -41,17 +54,17 @@ for i in unique(dat_obs.ID); push!(times, dat_obs.TIME[dat_obs.ID .== i]); end
 
 # fixed parameters
 wts = dat.WT[dat.EVID .== 1,:]
-VVBs = (5.62 .* wts ./ 100) ./ 1.040
-BP = 0.61
+VVBs = (5.62 .* wts ./ 100) ./ 1.040  # volume of venous blood
+BP = 0.61  # blood:plasma concentration ratio
 
-# callback function for infusion stopping
+# callback function for infusion stopping via zeroing k₀ parameter at end of infusion
 function affect!(integrator)
     integrator.p[8] = integrator.p[8] == 0.0
 end
 cbs = []
 for i in 1:length(unique(dat.ID)); push!(cbs, PresetTimeCallback([durs[i]], affect!)); end
 
-# variable params
+# params to be estimated
 CLint = exp(7.1)
 KbBR = exp(1.1);
 KbMU = exp(0.3);
@@ -60,13 +73,13 @@ KbBO = exp(0.03);
 KbRB = exp(0.3);
 p = [CLint, KbBR, KbMU, KbAD, KbBO, KbRB, wts[1], rates[1]]
 
-# define problem
+# define the ODE problem
 prob = ODEProblem(PBPKODE!, u0, tspan, p)
 
 ########
 
-## sensitivity analysis ##
-## create function that takes in paramers and returns endpoints for sensitivity
+## global sensitivity analysis ##
+## create function that takes in paramers and returns endpoints for sensitivity (AUC in ths case)
 p_sens = p[1:6]
 f_globsens = function(p_sens)
     p_all = [p_sens;[wts[1],rates[1]]]
@@ -77,17 +90,16 @@ f_globsens = function(p_sens)
 end
 
 ### conditions
-n = 1000
-lb = [1000.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-ub = [1500.0, 10.0, 10.0, 10.0, 10.0, 10.0]
+n = 1000  # number of initial samples
+lb = [1000.0, 1.0, 1.0, 1.0, 1.0, 1.0]  # parameter lower bounds
+ub = [1500.0, 10.0, 10.0, 10.0, 10.0, 10.0]  # parameter upper bounds
 sampler = GlobalSensitivity.SobolSample()
-A, B = GlobalSensitivity.QuasiMonteCarlo.generate_design_matrices(n, lb, ub, sampler)
+A, B = GlobalSensitivity.QuasiMonteCarlo.generate_design_matrices(n, lb, ub, sampler)  # create the parameter set matrices to be passed to the gsa function
 
-bounds = [[1000.0,1500.0],[1.0,10.0],[1.0,10.0],[1.0,10.0],[1.0,10.0],[1.0,10.0]]
-
-#### Sobol
+#### Sobol global sensitivity analysis
 @time s = GlobalSensitivity.gsa(f_globsens, Sobol(), A, B)
 
+#### plot
 plot_sens_total = Plots.bar(["CLint","KbBR","KbMU","KbAD","KbBO","KbRB"], s.ST, title="Total Order Indices", ylabel="Index", legend=false)
 Plots.hline!([0.05], linestyle=:dash)
 plot_sens_single = Plots.bar(["CLint","KbBR","KbMU","KbAD","KbBO","KbRB"], s.S1, title="First Order Indices", ylabel="Index", legend=false)
@@ -99,30 +111,35 @@ savefig(plot_sens, joinpath(figPath, "sensitivity.pdf"))
 #######
 
 ## Bayesian inference ##
+
+## define Bayesian model function
 @model function fitPBPK(data, prob, nSubject, rates, times, wts, cbs, VVBs, BP) # data should be a Vector
     # priors
-    σ ~ truncated(Cauchy(0, 0.5), 0.0, Inf) # residual error
-    ĈLint ~ LogNormal(7.1,0.25)
-    KbBR ~ LogNormal(1.1,0.25)
-    KbMU ~ LogNormal(0.3,0.25)
-    KbAD ~ LogNormal(2.0,0.25)
-    KbBO ~ LogNormal(0.03, 0.25)
-    KbRB ~ LogNormal(0.3, 0.25)
-    ω ~ truncated(Cauchy(0, 0.5), 0.0, 1.0)
-    ηᵢ ~ filldist(Normal(0.0, 1.0), nSubject)
+    ## informative priors for fixed effects and semi-informative for random effects
+    σ ~ truncated(Cauchy(0, 0.5), 0.0, Inf)  # residual error
+    ĈLint ~ LogNormal(7.1,0.25)  # intrinsic clearance
+    KbBR ~ LogNormal(1.1,0.25)  # brain to plasma partition coefficient
+    KbMU ~ LogNormal(0.3,0.25)  # muscle to plasma partition coefficient
+    KbAD ~ LogNormal(2.0,0.25)  # adipose to plasma partition coefficient
+    KbBO ~ LogNormal(0.03, 0.25)  # bone to plasma partition coefficient
+    KbRB ~ LogNormal(0.3, 0.25)  # rest of body to plasma partition coefficient
+    ω ~ truncated(Cauchy(0, 0.5), 0.0, 1.0)  # intersubject variability SD
+    ηᵢ ~ filldist(Normal(0.0, 1.0), nSubject)  # individual ηs for random effects
 
     # individual params
     CLintᵢ = ĈLint .* exp.(ω .* ηᵢ)  # non-centered parameterization
 
-    # simulate
+    # function to update ODE problem with newly sampled params
     function prob_func(prob,i,repeat)
         ps = [CLintᵢ[i], KbBR, KbMU, KbAD, KbBO, KbRB, wts[i], rates[i]]
         remake(prob, p=ps, saveat=times[i], callback=cbs[i])
     end
 
+    # define an ensemble problem and simulate the population
     tmp_ensemble_prob = EnsembleProblem(prob, prob_func=prob_func)
-    tmp_ensemble_sol = solve(tmp_ensemble_prob, Tsit5(), trajectories=nSubject) 
+    tmp_ensemble_sol = solve(tmp_ensemble_prob, Tsit5(), EnsembleSerial(), trajectories=nSubject) 
 
+    # calculate predicted plasma concentration for the population and append in a vector 
     predicted = []
     for i in 1:nSubject
         times_tmp = times[i]
@@ -137,34 +154,36 @@ savefig(plot_sens, joinpath(figPath, "sensitivity.pdf"))
     end
 end
 
+# define the Bayesian model object
 mod = fitPBPK(dat_obs.DV, prob, nSubject, rates, times, wts, cbs, VVBs, BP)
 
-# run 
-## serial 
-#@time mcmcchains = mapreduce(c -> sample(mod, NUTS(250,adapt_delta), 250), chainscat, 1:4)  # serial
-#@time mcmcchains_prior = mapreduce(c -> sample(mod, Prior(), 250), chainscat, 1:4)  # serial
-
-## multithreading
+# sample ; caution: sampling might take several hours to finish
+# you can skip sampling and go directly to line 191 to load saved samples
+## sampling conditions
 nsampl = 250
 nchains = 4
 adapt_delta = .8
-#@time mcmcchains = sample(mod, NUTS(nsampl,adapt_delta), MCMCThreads(), nsampl, nchains)
-#@time mcmcchains_prior = sample(mod, Prior(), MCMCThreads(), nsampl, nchains)  # parallel
-@time mcmcchains = sample(mod, NUTS(nsampl,adapt_delta), MCMCSerial(), nsampl, nchains)
-@time mcmcchains_prior = sample(mod, Prior(), MCMCSerial(), nsampl, nchains)  # parallel
+
+## sampling in serial 
+#@time mcmcchains = sample(mod, NUTS(nsampl,adapt_delta), MCMCSerial(), nsampl, nchains)
+#@time mcmcchains_prior = sample(mod, Prior(), MCMCSerial(), nsampl, nchains)  # parallel
+
+## sampling with multithreading ; caution: results might not be reproducible 
+@time mcmcchains = sample(mod, NUTS(nsampl,adapt_delta), MCMCThreads(), nsampl, nchains)
+@time mcmcchains_prior = sample(mod, Prior(), MCMCThreads(), nsampl, nchains)  # parallel
 
 ## save mcmcchains
 write(joinpath(modPath, string(modName, "chains.jls")), mcmcchains)
 write(joinpath(modPath, string(modName, "chains_prior.jls")), mcmcchains_prior)
 
-##load saved chains
+##uncomment to load saved chains
 #mcmcchains = read(joinpath(modPath, string(modName, "chains.jls")), Chains)
 
 
 #---# diagnostics #---#
 # tables
 summ, quant = describe(mcmcchains)
-#summ, quant = describe(mcmcchains; q = [0.05, 0.25, 0.5, 0.75, 0.95])
+#summ, quant = describe(mcmcchains; q = [0.05, 0.25, 0.5, 0.75, 0.95])  # control quantiles in output
 
 ## summary
 df_summ = DataFrame(summ)
@@ -175,7 +194,7 @@ df_quant = DataFrame(quant)
 CSV.write(joinpath(tabPath, "Quantiles.csv"), df_quant)
 
 # plots
-## trace plots
+## trace plots ; we will split plots and join later for better view
 #plot_chains = StatsPlots.plot(mcmcchains[:,1:8,:])  # mcmcchains[samples, params, chains]
 plot_chains1 = StatsPlots.plot(mcmcchains[:,1:4,:])
 plot_chains2 = StatsPlots.plot(mcmcchains[:,5:8,:])
@@ -210,25 +229,17 @@ plot_dens = Plots.plot(dens_plots[1],
                         size = (650,650))
 savefig(plot_dens, joinpath(figPath, "DensPlots.pdf"))
 
+#---# predictive checks #---#
 
 #=
-## rhat
-df_tmp = @orderby(DataFrame(summ)[1:8,:], :rhat)
-plot_rhat = Plots.bar(string.(df_tmp.parameters), df_tmp.rhat, orientation=:h, legend = false, xlim=[0.99,1.05], xticks=[1.0,1.05], xlabel = "R̂")
-Plots.vline!([1.0,1.05], linestyle=[:solid,:dash])
-savefig(plot_rhat, joinpath(figPath, "rhat.pdf"))
-
-## neff
-df_tmp = @orderby(@transform!(df_tmp, :neff = :ess ./ 1000.0), :neff)
-plot_neff = Plots.bar(string.(df_tmp.parameters), df_tmp.neff, orientation=:h, legend = false, xlim=[0.0,2.5], xticks=[0.0:0.25:2.5;], xlabel = "Neff/N")
-Plots.vline!([0.1,0.5,1.0], linestyle=:dash)
-savefig(plot_neff, joinpath(figPath, "neff.pdf"))
+Predicitive checks can be conditioned on sampled parameters or on samples from a new population.
+Here, we will do both.
 =#
-
-#---# predictive checks #---#
 
 #--# conditional on chains #--#
 
+# we will first create a vector of "missing" values to pass to the Bayesian fit function
+# Turing will understand that the created model object is meant to simulate rather than fit
 dat_missing = Vector{Missing}(missing, length(dat_obs.DV)) # vector of `missing`
 mod_pred = fitPBPK(dat_missing, prob, nSubject, rates, times, wts, cbs, VVBs, BP)
 #pred = predict(mod_pred, mcmcchains)  # posterior ; conditioned on each sample in chains
@@ -245,7 +256,7 @@ summ_pred, quant_pred = describe(pred)
 #CSV.write(joinpath(tabPath, "Summary_PPC.csv"), summ_pred)
 #CSV.write(joinpath(tabPath, "Quantiles_PPC.csv"), quant_pred)
 
-# data assembly
+# data assembly to summarise and bring observed and predicted data together
 bins = [0, 1, 2, 3, 4, 6, 8, 10, 20, 30, 40, 50]
 labels = string.(1:length(bins) - 1)
 
@@ -316,9 +327,10 @@ df_params = DataFrame(mcmcchains)[:,3:10]
 # save CSV
 #CSV.write(joinpath(modPath, "df_params.csv"), df_params)
 
-## new etas
+## new etas for a new population
 ηs = reshape(rand(Normal(0.0, 1.0), nSubject*nrow(df_params)), nrow(df_params), nSubject)
 
+# run simulations for the new population
 array_pred = Array{Float64}(undef, nrow(df_params), nrow(dat_obs))
 
 for j in 1:nrow(df_params)
@@ -365,6 +377,7 @@ end
 # save CSV
 #CSV.write(joinpath(modPath, "df_pred.csv"), df_pred_new2)
 
+# create the new population predictions dataframe
 df_vpc_pred_new = @chain begin
     df_pred_new
     DataFramesMeta.stack(1:268)
@@ -415,6 +428,7 @@ df_cObs = @chain begin
     @select(:ID,:TIME,:DV,:DOSE)
 end
 
+# conditioned on individual data
 df_cCond = @chain begin
     df_vpc_pred
     groupby([:ID,:TIME])
@@ -425,6 +439,7 @@ df_cCond = @chain begin
     unique()
 end
 
+# conditioned on individuals in a new population
 df_cPred = @chain begin
     df_vpc_pred_new
     groupby([:ID,:TIME])
@@ -443,27 +458,12 @@ df_cAll = hcat(df_cObs,
 # save CSV for plotting in R
 CSV.write(joinpath(modPath, "df_ind.csv"), df_cAll)
 
-#=
-# plot
-plot_ind = Gadfly.plot(df_call, x=:TIME, y=:DV, xgroup=:ID, Geom.subplot_grid(Geom.point),
-                       Theme(background_color="white", default_color="black"), 
-                       Scale.y_log10) 
-plot_ind = Gadfly.plot(df_call, x=:TIME, Theme(background_color="white", default_color="black"), Scale.y_log10, 
-    layer(y=:DV, Geom.point))
-
-
-plot_ind = Gadfly.plot(x=dat_obs2.TIME, y=dat_obs2.DNDV, Geom.point, Scale.y_log10, Theme(background_color="white", default_color="black"), alpha=[0.2], Guide.xlabel("Time (h)"), Guide.ylabel("Mavoglurant dose-normalized concentration (ng/mL/mg)", orientation=:vertical),
-layer(x=df_vpc_obs.TIME, y=df_vpc_obs.med, Geom.line, Theme(default_color="black")),
-layer(x=df_vpc_obs.TIME, y=df_vpc_obs.lo, Geom.line, Theme(default_color="black")),
-layer(x=df_vpc_obs.TIME, y=df_vpc_obs.hi, Geom.line, Theme(default_color="black")),
-layer(x=df_vpc_pred_new2.TIME, ymin=df_vpc_pred_new2.loMed, ymax=df_vpc_pred_new2.hiMed, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.8]),
-layer(x=df_vpc_pred_new2.TIME, ymin=df_vpc_pred_new2.loLo, ymax=df_vpc_pred_new2.hiLo, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.5]),
-layer(x=df_vpc_pred_new2.TIME, ymin=df_vpc_pred_new2.loHi, ymax=df_vpc_pred_new2.hiHi, Geom.ribbon, Theme(default_color="deepskyblue"), alpha=[0.5]))
-=#
-
 #######
 
 ## simulation ##
+
+### use the sampled parameters to run simulations for an alternative dosing scenario:
+### 500 mg single infusion dose administered to 500 subjects
 
 # get wts for 500 individuals
 wts_sim = @chain begin 

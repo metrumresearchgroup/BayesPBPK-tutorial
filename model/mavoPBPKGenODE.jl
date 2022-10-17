@@ -1,3 +1,15 @@
+#=
+Version: October 7, 2022
+
+Online supplement to the tutorial: 
+
+Bayesian PBPK Modeling using R/Stan/Torsten and Julia/SciML/Turing.jl
+
+This function defines the ODE function that would then be called by the ODEProblem function in script/mavoPBPKGenODE_run.jl
+
+For further details on how this function can be defined, checkout https://diffeq.sciml.ai/stable/
+=#
+
 function PBPKODE!(du, u, p, t)
     ## parameters to be estimated ##
     CLint = p[1];
