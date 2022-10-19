@@ -1,11 +1,11 @@
 #=
-Version: October 7, 2022
+Version: October 18, 2022
 
 Online supplement to the tutorial: 
 
 Bayesian PBPK Modeling using R/Stan/Torsten and Julia/SciML/Turing.jl
 
-This script runs the Bayesian PBPK modeling in Julia/SciML/Turing.jl
+This script runs the Bayesian PBPK linear ODE modeling in Julia/SciML/Turing.jl
 =#
 
 # activate pkg environment and load libraries

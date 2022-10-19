@@ -128,7 +128,7 @@ nTheta <- 6
 
 ## get inits
 init <- function(){
-  list(CLintHat = rlnorm(1, meanlog=7.6, sdlog=0.25),
+  list(CLintHat = rlnorm(1, meanlog=7.1, sdlog=0.25),
        KbBR = rlnorm(1, meanlog=1.1, sdlog=0.25),
        KbMU = rlnorm(1, meanlog=0.3, sdlog=0.25),
        KbAD = rlnorm(1, meanlog=2, sdlog=0.25),
@@ -202,6 +202,7 @@ if(runAnalysis){
   # load fit object
   fit <- readRDS(file.path(outDir, paste0(modelName, ".fit.RDS")))
   
+  # set theme for plots
   myTheme <- theme(text = element_text(size = 12), axis.text = element_text(size = 12))
   
   parametersToPlot <- setdiff(parametersToPlot, "rho")
