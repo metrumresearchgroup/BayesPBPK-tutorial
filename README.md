@@ -7,7 +7,7 @@ Scripts to run the analyses are:
 - `script/mavoPBPKGenODE.R`: runs the R/Stan/Torsten general ODE analysis using the model `model/mavoPBPKGenODE.stan`.
 - `script/mavoPBPKLinODE.R`: runs the R/Stan/Torsten linear ODE analysis using the model `model/mavoPBPKLinODE.stan`.
 - `script/mavoPBPKGenODE_run.jl`: runs the Julia/SciML/Turing.jl general ODE analysis using the model `model/mavoPBPKGenODE.jl`.
-- `script/mavoPBPKLinODE_run.jl`: runs the Julia/SciML/Turing.jl linear ODE analysis using the model `model/mavoPBPKLinODE.jl`. **Note: This analysis is still not ready and is kept in the repository as a place holder**. 
+- `script/mavoPBPKLinODE_run.jl`: runs the Julia/SciML/Turing.jl linear ODE analysis using the model `model/mavoPBPKLinODE.jl`. **Note: This script is still not finalized and is kept in the repository as a place holder**. 
 
 R `sessionInfo()`
 
