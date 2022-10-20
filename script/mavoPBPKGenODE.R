@@ -13,7 +13,22 @@
 rm(list = ls())
 gc()
 
+# load libraries
+library(tidyverse)
+library(rstan)
+library(bayesplot)
+library(loo)
+library(parallel)
+library(future.apply)
+library(cmdstanr)
+library(posterior)
+library(vpc)
+library(mrggsave)
+library(cowplot)
+library(here)
+
 # set environment
+setwd(here("script"))
 modelName <- "mavoPBPKGenODE"
 scriptName <- paste(modelName, "R", sep = ".")
 
@@ -41,20 +56,7 @@ invisible(dir.create(outDir,recursive=T))
 fitModel <- TRUE
 useRStan <- FALSE
 runAnalysis <- FALSE
-nslaves <- 5   # number of processes (cores) per chain
-
-# load libraries
-library(tidyverse)
-library(rstan)
-library(bayesplot)
-library(loo)
-library(parallel)
-library(future.apply)
-library(cmdstanr)
-library(posterior)
-library(vpc)
-library(mrggsave)
-library(cowplot)
+nslaves <- 4
 
 source(file.path(toolsDir, "stanTools.R"))
 source(file.path(toolsDir, "functions.R"))
@@ -177,21 +179,26 @@ if(fitModel){
             file.path(outDir, paste0(modelName, ".stan")), overwrite = TRUE)
   
   # metworx
-  mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")),
-                        cpp_options=list(TORSTEN_MPI=1,TBB_CXX_TYPE="gcc"),force_recompile=TRUE,quiet=FALSE)
+  ## uncomment the following lines to run MPI on metworx
+  #mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")),
+  #                      cpp_options=list(TORSTEN_MPI=1,TBB_CXX_TYPE="gcc"),force_recompile=TRUE,quiet=FALSE)
   
   # local
-  #mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")), 
-  #                      cpp_options=list(TORSTEN_MPI=1,TBB_CXX_TYPE="clang"),force_recompile=TRUE,quiet=FALSE)
+  ## uncomment the following lines to run MPI locally
+  # mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")), 
+  #                       cpp_options=list(TORSTEN_MPI=1,TBB_CXX_TYPE="clang"),force_recompile=TRUE,quiet=FALSE)
+  # 
+  mod <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")))
+  
   
   fit <- mod$sample_mpi(data = data, chains = nChains, init = init,
-                    #parallel_chains = nChains,
+                    parallel_chains = nChains,
                     iter_warmup = nBurn, iter_sampling = nPost,
                     seed = sample(1:999999, 1), adapt_delta = 0.8,
                     refresh = 10,
-                    output_dir = outDir,
                     # the -l option will tag each output line with MPI process id
-                    mpi_args = list("n" = nslaves, "-l" = NULL))
+                    #mpi_args = list("n" = nslaves, "-l" = NULL),
+                    output_dir = outDir)
   
   fit$save_object(file.path(outDir, paste0(modelName, ".fit.RDS")))
 }else{

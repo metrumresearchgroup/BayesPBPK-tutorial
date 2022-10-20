@@ -17,6 +17,7 @@ Packages:
   - cmdstanr
   - posterior
   - vpc
+  - here
 
 Repos:
   - MPN: https://mpn.metworx.com/snapshots/stable/2021-04-15/

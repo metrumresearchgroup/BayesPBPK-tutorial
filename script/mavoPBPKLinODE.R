@@ -13,8 +13,23 @@
 rm(list = ls())
 gc()
 
+# load libraries
+library(tidyverse)
+library(rstan)
+library(bayesplot)
+library(loo)
+library(parallel)
+library(future.apply)
+library(cmdstanr)
+library(posterior)
+library(vpc)
+library(mrggsave)
+library(cowplot)
+library(here)
+
 # set environment
-modelName <- "mavoPBPKLinODE"
+setwd(here("script"))
+modelName <- "mavoPBPKGenODE"
 scriptName <- paste(modelName, "R", sep = ".")
 
 ## Relative paths assuming the working directory is the script directory
@@ -42,19 +57,6 @@ fitModel <- TRUE
 useRStan <- FALSE
 runAnalysis <- FALSE
 
-# load libraries
-library(tidyverse)
-library(rstan)
-library(bayesplot)
-library(loo)
-library(parallel)
-library(future.apply)
-library(cmdstanr)
-library(posterior)
-library(vpc)
-library(mrggsave)
-library(cowplot)
-
 source(file.path(toolsDir, "stanTools.R"))
 source(file.path(toolsDir, "functions.R"))
 if(!useRStan) source(file.path(toolsDir, "cmdStanTools.R"))
@@ -63,7 +65,7 @@ set_cmdstan_path(stanDir)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
-set.seed(1111) ## not required but assures repeatable results
+set.seed(11191962) ## not required but assures repeatable results
 
 ################################################################################
 ################################# Prepare data #################################
