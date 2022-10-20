@@ -1,6 +1,24 @@
 # BayesPBPK-tutorial
 
-This tutorial demonstrates population Bayesian PBPK analyses using the open-source tools R/Stan/Torsten and Julia/SciML/Turing.jl. 
+This tutorial demonstrates population Bayesian PBPK analyses using the open-source tools R/Stan/Torsten and Julia/SciML/Turing.jl.
+
+## Cloning the repository:
+
+- Click the `code` drop-down menu on the Github repository page.
+- Copy the repository url.
+- Open a terminal, go to where you like the repository to be cloned and type `git clone <copied url>`
+
+## Setting up environments and package installation:
+- R:
+  - Recommended IDE is Rstudio.
+  - Install `pkgr` following the instructions [here](https://github.com/metrumresearchgroup/pkgr).
+  - Activate the R project environment in Rstudio by going to `File` -> `Open Project` then browse to the `BayesPBPK.Rproj` file.
+  - Open a terminal and from within the root directory (where the `pkgr.yml` file is), type in `pkgr install`. This will install all packages listed in that `pkgr.yml` file and will make them available for loading whenever this project environment is activated.
+
+- Julia:
+  - Recommended IDE is Visual Studio Code.
+  - Open a julia REPL by going to `View` -> `Command Palette` then typing `Julia: Start REPL`. 
+  - Make sure you are in the root directory (where the `Project.toml` file is located) then activate the julia project environment by typing `]` -> `activate .` -> `instantiate`. This will install all packages listed in the `Project.toml` file and make them available for loading whenever this project environment is activated.
 
 Scripts to run the analyses are:
 
