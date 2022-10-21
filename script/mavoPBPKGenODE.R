@@ -178,8 +178,17 @@ if(fitModel){
   file.copy(file.path(modelDir, paste0(modelName, ".stan")), 
             file.path(outDir, paste0(modelName, ".stan")), overwrite = TRUE)
   
+  mod <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")))
+  
+  fit <- mod$sample(data = data, chains = nChains, init = init,
+                    parallel_chains = nChains,
+                    iter_warmup = nBurn, iter_sampling = nPost,
+                    seed = sample(1:999999, 1), adapt_delta = 0.8,
+                    refresh = 10,
+                    output_dir = outDir)
+  
+  ## uncomment the following lines to run MPI
   # metworx
-  ## uncomment the following lines to run MPI on metworx
   #mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")),
   #                      cpp_options=list(TORSTEN_MPI=1,TBB_CXX_TYPE="gcc"),force_recompile=TRUE,quiet=FALSE)
   
@@ -188,17 +197,16 @@ if(fitModel){
   # mod  <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")), 
   #                       cpp_options=list(TORSTEN_MPI=1,TBB_CXX_TYPE="clang"),force_recompile=TRUE,quiet=FALSE)
   # 
-  mod <- cmdstan_model(file.path(outDir, paste0(modelName, ".stan")))
   
-  
-  fit <- mod$sample_mpi(data = data, chains = nChains, init = init,
-                    parallel_chains = nChains,
-                    iter_warmup = nBurn, iter_sampling = nPost,
-                    seed = sample(1:999999, 1), adapt_delta = 0.8,
-                    refresh = 10,
-                    # the -l option will tag each output line with MPI process id
-                    #mpi_args = list("n" = nslaves, "-l" = NULL),
-                    output_dir = outDir)
+  # fit <- mod$sample_mpi(data = data, chains = nChains, init = init,
+  #                       #parallel_chains = nChains,
+  #                       iter_warmup = nBurn, iter_sampling = nPost,
+  #                       seed = sample(1:999999, 1), adapt_delta = 0.8,
+  #                       refresh = 10,
+  #                       # the -l option will tag each output line with MPI process id
+  #                       mpi_args = list("n" = nslaves, "-l" = NULL),
+  #                       output_dir = outDir)
+
   
   fit$save_object(file.path(outDir, paste0(modelName, ".fit.RDS")))
 }else{

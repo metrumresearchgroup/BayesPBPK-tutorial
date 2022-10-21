@@ -1,6 +1,6 @@
 functions{
-  real[] PBPKModelODE(real t, real[] x, real[] parms, real[] rdummy, int[] idummy){
-    real dxdt[16];
+  vector PBPKModelODE(real t, vector x, array[] real parms, array[] real rdummy, array[] int idummy){
+    vector[16] dxdt;
     real WT = rdummy[1];
     
     //// fixed parameters ////
@@ -106,22 +106,22 @@ functions{
 data{
   int<lower = 1> nt;
   int<lower = 1> nObs;
-  int<lower = 1> iObs[nObs];
-  real<lower = 0> amt[nt];
-  int cmt[nt];
-  int<lower = 0> evid[nt];
-  real<lower = 0> time[nt];
-  real<lower = 0> ii[nt];
-  int<lower = 0> addl[nt];
-  int<lower = 0> ss[nt];
-  real rate[nt];
+  array[nObs] int<lower = 1> iObs;
+  array[nt] real<lower = 0> amt;
+  array[nt] int cmt;
+  array[nt] int<lower = 0> evid;
+  array[nt] real<lower = 0> time;
+  array[nt] real<lower = 0> ii;
+  array[nt] int<lower = 0> addl;
+  array[nt] int<lower = 0> ss;
+  array[nt] real rate;
   vector<lower = 0>[nObs] cObs;
   
   // data for population model
   int<lower = 1> nSubject;
-  int<lower = 1> start[nSubject];
-  int<lower = 1> end[nSubject];
-  real<lower = 0> weight[nSubject];
+  array[nSubject] int<lower = 1> start;
+  array[nSubject] int<lower = 1> end;
+  array[nSubject] real<lower = 0> weight;
 }
 
 transformed data{
@@ -129,12 +129,12 @@ transformed data{
   int nTheta = 6;  // number of parameters
   int nIIV = 1;  // parameters with IIV
   int nCmt = 16;  // number of compartments
-  real biovar[nSubject, nCmt];
-  real tlag[nSubject, nCmt];
-  real VVB[nSubject];
-  int len[nSubject];
-  real<lower = 0> WT[nSubject, 1]; 
-  int<lower = 0> idummy[nSubject, 1];
+  array[nSubject, nCmt] real biovar;
+  array[nSubject, nCmt] real tlag;
+  array[nSubject] real VVB;
+  array[nSubject] int len;
+  array[nSubject, 1] real<lower = 0> WT; 
+  array[nSubject, 1] int<lower = 0> idummy;
   real BP = 0.61;      // Blood:plasma partition coefficient
   
   for (i in 1:nSubject) {
@@ -170,7 +170,7 @@ transformed parameters{
   row_vector<lower = 0>[nt] cHat;
   row_vector<lower = 0>[nObs] cHatObs;
   matrix<lower = 0>[nCmt, nt] x;
-  real<lower = 0> parms[nSubject, nTheta]; // The [1] indicates the parameters are constant
+  array[nSubject, nTheta] real<lower = 0> parms; // The [1] indicates the parameters are constant
   
   // variables for Matt's trick
   vector<lower = 0>[nIIV] thetaHat;
@@ -222,7 +222,7 @@ model{
 
 generated quantities{
   matrix[nCmt, nt] xPred;
-  real<lower = 0> parmsPred[nSubject, nTheta];
+  array[nSubject, nTheta] real<lower = 0> parmsPred;
   row_vector<lower = 0>[nt] cHatPred;
   row_vector<lower = 0>[nObs] cHatObsPred;
   vector<lower = 0>[nObs] cObsCond;

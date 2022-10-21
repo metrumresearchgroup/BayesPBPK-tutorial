@@ -1,22 +1,22 @@
 data{
   int<lower = 1> nt;
   int<lower = 1> nObs;
-  int<lower = 1> iObs[nObs];
-  real<lower = 0> amt[nt];
-  int cmt[nt];
-  int<lower = 0> evid[nt];
-  real<lower = 0> time[nt];
-  real<lower = 0> ii[nt];
-  int<lower = 0> addl[nt];
-  int<lower = 0> ss[nt];
-  real rate[nt];
+  array[nObs] int<lower = 1> iObs;
+  array[nt] real<lower = 0> amt;
+  array int cmt;
+  array[nt] int<lower = 0> evid;
+  array[nt] real<lower = 0> time;
+  array[nt] real<lower = 0> ii;
+  array[nt] int<lower = 0> addl;
+  array[nt] int<lower = 0> ss;
+  array[nt] real rate;
   vector<lower = 0>[nObs] cObs;
   
   // data for population model
   int<lower = 1> nSubject;
-  int<lower = 1> start[nSubject];
-  int<lower = 1> end[nSubject];
-  real<lower = 0> weight[nSubject];
+  array[nSubject] int<lower = 1> start;
+  array[nSubject] int<lower = 1> end;
+  array[nSubject] real<lower = 0> weight;
 }
 
 transformed data{
@@ -24,8 +24,8 @@ transformed data{
   int nTheta = 6;  // number of parameters
   int nIIV = 1;  // parameters with IIV
   int nCmt = 16;  // number of compartments
-  real biovar[nCmt];
-  real tlag[nCmt];
+  array[nCmt] real biovar;
+  array[nCmt] real tlag;
   
   // objects to hold fixed parameters
     // Regional blood flows

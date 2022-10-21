@@ -29,7 +29,7 @@ library(here)
 
 # set environment
 setwd(here("script"))
-modelName <- "mavoPBPKGenODE"
+modelName <- "mavoPBPKLinODE"
 scriptName <- paste(modelName, "R", sep = ".")
 
 ## Relative paths assuming the working directory is the script directory
