@@ -3,7 +3,7 @@ data{
   int<lower = 1> nObs;
   array[nObs] int<lower = 1> iObs;
   array[nt] real<lower = 0> amt;
-  array int cmt;
+  array[nt] int cmt;
   array[nt] int<lower = 0> evid;
   array[nt] real<lower = 0> time;
   array[nt] real<lower = 0> ii;
@@ -29,40 +29,40 @@ transformed data{
   
   // objects to hold fixed parameters
     // Regional blood flows
-    real CO[nSubject];         // Cardiac output (L/h) from White et al (1968)
-    real QHT[nSubject];
-    real QBR[nSubject];
-    real QMU[nSubject];
-    real QAD[nSubject];
-    real QSK[nSubject];
-    real QSP[nSubject];
-    real QPA[nSubject];
-    real QLI[nSubject];
-    real QST[nSubject];
-    real QGU[nSubject];
-    real QHA[nSubject]; // Hepatic artery blood flow
-    real QBO[nSubject];
-    real QKI[nSubject];
-    real QRB[nSubject];
-    real QLU[nSubject];
+    array[nSubject] real CO;         // Cardiac output (L/h) from White et al (1968)
+    array[nSubject] real QHT;
+    array[nSubject] real QBR;
+    array[nSubject] real QMU;
+    array[nSubject] real QAD;
+    array[nSubject] real QSK;
+    array[nSubject] real QSP;
+    array[nSubject] real QPA;
+    array[nSubject] real QLI;
+    array[nSubject] real QST;
+    array[nSubject] real QGU;
+    array[nSubject] real QHA; // Hepatic artery blood flow
+    array[nSubject] real QBO;
+    array[nSubject] real QKI;
+    array[nSubject] real QRB;
+    array[nSubject] real QLU;
     
     // Organs' volumes = organs' weights / organs' density
-    real VLU[nSubject];
-    real VHT[nSubject];
-    real VBR[nSubject];
-    real VMU[nSubject];
-    real VAD[nSubject];
-    real VSK[nSubject];
-    real VSP[nSubject];
-    real VPA[nSubject];
-    real VLI[nSubject];
-    real VST[nSubject];
-    real VGU[nSubject];
-    real VBO[nSubject];
-    real VKI[nSubject];
-    real VAB[nSubject];
-    real VVB[nSubject];
-    real VRB[nSubject];
+    array[nSubject] real VLU;
+    array[nSubject] real VHT;
+    array[nSubject] real VBR;
+    array[nSubject] real VMU;
+    array[nSubject] real VAD;
+    array[nSubject] real VSK;
+    array[nSubject] real VSP;
+    array[nSubject] real VPA;
+    array[nSubject] real VLI;
+    array[nSubject] real VST;
+    array[nSubject] real VGU;
+    array[nSubject] real VBO;
+    array[nSubject] real VKI;
+    array[nSubject] real VAB;
+    array[nSubject] real VVB;
+    array[nSubject] real VRB;
     
     // partition coefficients
     real KbLU = exp(0.8334);
@@ -153,7 +153,7 @@ transformed parameters{
   matrix<lower = 0>[nSubject, nIIV] thetaM; 
   
   // individual-level physiological paraeters
-  real CLint[nSubject];
+  array[nSubject] real CLint;
 
   // Matt's trick to use unit scale
   thetaHat[1] = CLintHat; 
@@ -259,7 +259,7 @@ generated quantities{
   corr_matrix[nIIV] rho;
   
   // Individual-level model parameters
-  real CLintPred[nSubject];
+  array[nSubject] real CLintPred;
   
   rho = L * L';
   for(i in 1:nSubject) {
