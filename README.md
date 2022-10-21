@@ -11,9 +11,10 @@ This tutorial demonstrates population Bayesian PBPK analyses using the open-sour
 ## Setting up environments and package installation:
 - R:
   - Recommended IDE is Rstudio.
-  - Install `pkgr` following the instructions [here](https://github.com/metrumresearchgroup/pkgr).
   - Activate the R project environment in Rstudio by going to `File` -> `Open Project` then browse to the `BayesPBPK.Rproj` file.
-  - Open a terminal and from within the root directory (where the `pkgr.yml` file is), type in `pkgr install`. This will install all packages listed in that `pkgr.yml` file and will make them available for loading whenever this project environment is activated.
+  - Activate the `renv` by running `library(renv)` and `renv::activate()`
+  - Install/restore packages from the `renv.lock` file by running `renv::restore()`
+  - This will install all packages listed in the `pkgs.R` file and will make them available for loading whenever this project environment is activated.
 
 - Julia:
   - Recommended IDE is Visual Studio Code.
