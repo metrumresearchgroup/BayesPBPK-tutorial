@@ -2,8 +2,13 @@
 ################################## Intro #######################################
 ################################################################################
 
-# Script to run mavoglurant population PBPK model using general ODE solver
-# nlmixr reference: https://nlmixrdevelopment.github.io/nlmixr.examples/articles/mavoglurant.html 
+# Version: October 20, 2022
+# 
+# Online supplement to the tutorial: 
+#   
+#   Bayesian PBPK Modeling using R/Stan/Torsten and Julia/SciML/Turing.jl
+# 
+# This script runs the Bayesian PBPK modeling general ODE in R/Stan/Torsten
 
 ################################################################################
 ################################## setup #######################################
