@@ -129,6 +129,8 @@ p = [CLint, KbBR, KbMU, KbAD, KbBO, KbRB, wts[1]]
 
     # define an ensemble problem and simulate the population
     tmp_ensemble_prob = EnsembleProblem(prob1, prob_func=prob_func)
+    # solving can be parallelized by replacing EnsembleSerial() with EnsembleThreads() but there is no need since chains will be parallelized later
+    # and having nested parallelization might lead to non reproducible results
     tmp_ensemble_sol = solve(tmp_ensemble_prob, LinearExponential(), EnsembleSerial(), trajectories=nSubject) 
 
     # calculate predicted plasma concentration for the population and append in a vector 

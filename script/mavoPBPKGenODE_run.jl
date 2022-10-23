@@ -137,6 +137,8 @@ savefig(plot_sens, joinpath(figPath, "sensitivity.pdf"))
 
     # define an ensemble problem and simulate the population
     tmp_ensemble_prob = EnsembleProblem(prob, prob_func=prob_func)
+    # solving can be parallelized by replacing EnsembleSerial() with EnsembleThreads() but there is no need since chains will be parallelized later
+    # and having nested parallelization might lead to non reproducible results
     tmp_ensemble_sol = solve(tmp_ensemble_prob, Tsit5(), EnsembleSerial(), trajectories=nSubject) 
 
     # calculate predicted plasma concentration for the population and append in a vector 
@@ -168,7 +170,7 @@ adapt_delta = .8
 #@time mcmcchains = sample(mod, NUTS(nsampl,adapt_delta), MCMCSerial(), nsampl, nchains)
 #@time mcmcchains_prior = sample(mod, Prior(), MCMCSerial(), nsampl, nchains)  # parallel
 
-## sampling with multithreading ; caution: results might not be reproducible 
+## sampling with multithreading 
 @time mcmcchains = sample(mod, NUTS(nsampl,adapt_delta), MCMCThreads(), nsampl, nchains)
 @time mcmcchains_prior = sample(mod, Prior(), MCMCThreads(), nsampl, nchains)  # parallel
 
