@@ -171,8 +171,8 @@ modelFile <- file.path(modelDir, paste(modelName, ".stan", sep = ""))
 
 ## Run Stan
 nChains <- 4
-nPost <- 5 #250 ## Number of post-burn-in samples per chain after thinning
-nBurn <- 5 #250 ## Number of burn-in samples per chain after thinning
+nPost <- 250 ## Number of post-burn-in samples per chain after thinning
+nBurn <- 250 ## Number of burn-in samples per chain after thinning
 nThin <- 1
 
 nIter <- (nPost + nBurn) * nThin
