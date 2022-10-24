@@ -148,16 +148,6 @@ init <- function(){
        etaStd = matrix(rep(0, nIIV * nSubject), nrow = nIIV))
 }
 
-## Specify the variables for which you want history and density plots
-parametersToPlot <- c("CLintHat", "KbBR", "KbMU", "KbAD", "KbBO", "KbRB",
-                      "sigma", "omega", "rho")
-
-## Additional variables to monitor
-otherRVs <- c("cObsCond", "cObsPred", 
-              "cHat")
-
-parameters <- c(parametersToPlot, otherRVs)
-
 ################################################################################
 ################################################################################
 
@@ -208,6 +198,16 @@ if(runAnalysis){
   
   # load fit object
   fit <- readRDS(file.path(outDir, paste0(modelName, ".fit.RDS")))
+  
+  ## Specify the variables for which you want history and density plots
+  parametersToPlot <- c("CLintHat", "KbBR", "KbMU", "KbAD", "KbBO", "KbRB",
+                        "sigma", "omega", "rho")
+  
+  ## Additional variables to monitor
+  otherRVs <- c("cObsCond", "cObsPred", 
+                "cHat")
+  
+  parameters <- c(parametersToPlot, otherRVs)
   
   # set theme for plots
   myTheme <- theme(text = element_text(size = 12), axis.text = element_text(size = 12))
