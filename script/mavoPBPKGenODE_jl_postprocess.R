@@ -16,11 +16,13 @@ library(vpc)
 library(posterior)
 library(bayesplot)
 library(cowplot)
+library(here)
 
 # environment
 modelName <- "mavoPBPKGenODE_jl"
 scriptName <- paste0(modelName, "_postprocess", ".R")
 
+setwd(here("script"))
 scriptDir <- getwd()
 projectDir <- dirname(scriptDir)
 figDir <- file.path(projectDir, "deliv", "figure", modelName)

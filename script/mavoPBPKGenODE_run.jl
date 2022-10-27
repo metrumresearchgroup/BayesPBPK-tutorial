@@ -327,7 +327,7 @@ draw(plot_tmp, plot_ppc)
 
 df_params = DataFrame(mcmcchains)[:,3:10]
 
-# save CSV
+# save CSV; caution: uncommenting this will overwrite the already saved df_params.csv file
 #CSV.write(joinpath(modPath, "df_params.csv"), df_params)
 
 ## new etas for a new population
