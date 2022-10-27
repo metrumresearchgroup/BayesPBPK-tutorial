@@ -160,7 +160,7 @@ end
 mod = fitPBPK(dat_obs.DV, prob, nSubject, rates, times, wts, cbs, VVBs, BP)
 
 # sample ; caution: sampling might take several hours to finish
-# you can skip sampling and go directly to line 191 to load saved samples
+# you can skip sampling and go directly to lines 182 and 183 to load saved samples
 ## sampling conditions
 nsampl = 250
 nchains = 4
@@ -174,12 +174,13 @@ adapt_delta = .8
 @time mcmcchains = sample(mod, NUTS(nsampl,adapt_delta), MCMCThreads(), nsampl, nchains)
 @time mcmcchains_prior = sample(mod, Prior(), MCMCThreads(), nsampl, nchains)  # parallel
 
-## save mcmcchains
-write(joinpath(modPath, string(modName, "chains.jls")), mcmcchains)
-write(joinpath(modPath, string(modName, "chains_prior.jls")), mcmcchains_prior)
+## save mcmcchains; uncomment to save generated chains; caution: this will overwrite the already saved chains
+#write(joinpath(modPath, string(modName, "chains.jls")), mcmcchains)
+#write(joinpath(modPath, string(modName, "chains_prior.jls")), mcmcchains_prior)
 
 ##uncomment to load saved chains
 #mcmcchains = read(joinpath(modPath, string(modName, "chains.jls")), Chains)
+#mcmcchains_prior = read(joinpath(modPath, string(modName, "chains_prior.jls")), Chains)
 
 
 #---# diagnostics #---#

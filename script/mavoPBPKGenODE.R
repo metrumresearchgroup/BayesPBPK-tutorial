@@ -58,7 +58,9 @@ invisible(dir.create(tabDir,recursive=T))
 invisible(dir.create(outDir,recursive=T))
 
 # other conditions
-fitModel <- TRUE
+# caution: if fitModel = TRUE, this will fit and overwrite the already saved fit object
+# if you only want to run the analysis on the already saved fit object, set fitModel <- FALSE and runAnalysis <- TRUE 
+fitModel <- TRUE  
 useRStan <- FALSE
 runAnalysis <- FALSE
 nslaves <- 4
