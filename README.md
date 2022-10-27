@@ -79,10 +79,10 @@ loaded via a namespace (and not attached):
 Julia `versioninfo()`
 
 ```
-Julia Version 1.8.0-beta3
-Commit 3e092a2521 (2022-03-29 15:42 UTC)
+Julia Version 1.8.2
+Commit 36034abf260 (2022-09-29 15:21 UTC)
 Platform Info:
-  OS: macOS (x86_64-apple-darwin18.7.0)
+  OS: macOS (x86_64-apple-darwin21.4.0)
   CPU: 12 × Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz
   WORD_SIZE: 64
   LIBM: libopenlibm
@@ -96,27 +96,27 @@ Environment:
 Julia `Pkg.status()`
 
 ```
-Status `~/projects/git/metrumresearchgroup/BayesPBPK-tutorial/Project.toml`
- [336ed68f] CSV v0.10.3
- [159f3aea] Cairo v1.0.5
- [324d7699] CategoricalArrays v0.10.5
- [8be319e6] Chain v0.4.10
- [a93c6f00] DataFrames v1.3.2
- [1313f7d8] DataFramesMeta v0.10.0
- [459566f4] DiffEqCallbacks v2.22.0
- [41bf760c] DiffEqSensitivity v6.71.0
- [31c24e10] Distributions v0.25.53
- [e24c0720] ExponentialAction v0.2.3
- [d4d017d3] ExponentialUtilities v1.13.0
- [186bb1d3] Fontconfig v0.4.0
- [c91e804a] Gadfly v1.3.4
- [af5da776] GlobalSensitivity v1.3.2
- [2ee39098] LabelledArrays v1.8.0
- [c7f686f2] MCMCChains v5.1.0
- [1dea7af3] OrdinaryDiffEq v6.7.1
- [91a5bcdd] Plots v1.27.3
- [1fd47b50] QuadGK v2.4.2
- [6f49c342] RCall v0.13.13
- [f3b207a7] StatsPlots v0.14.33
- [fce5fe82] Turing v0.21.1
+  [336ed68f] CSV v0.10.6
+  [159f3aea] Cairo v1.0.5
+  [324d7699] CategoricalArrays v0.10.7
+  [8be319e6] Chain v0.5.0
+  [a93c6f00] DataFrames v1.4.1
+  [1313f7d8] DataFramesMeta v0.12.0
+  [459566f4] DiffEqCallbacks v2.24.3
+  [31c24e10] Distributions v0.25.76
+  [e24c0720] ExponentialAction v0.2.4
+  [d4d017d3] ExponentialUtilities v1.21.1
+  [186bb1d3] Fontconfig v0.4.0
+  [c91e804a] Gadfly v1.3.4
+  [af5da776] GlobalSensitivity v2.1.2
+  [2ee39098] LabelledArrays v1.12.5
+  [c7f686f2] MCMCChains v5.5.0
+  [429524aa] Optim v1.7.3
+  [1dea7af3] OrdinaryDiffEq v6.29.3
+  [91a5bcdd] Plots v1.35.5
+  [1fd47b50] QuadGK v2.6.0
+  [2913bbd2] StatsBase v0.33.21
+  [f3b207a7] StatsPlots v0.15.4
+  [fce5fe82] Turing v0.21.12
+  [37e2e46d] LinearAlgebra
 ```
