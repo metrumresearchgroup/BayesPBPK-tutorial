@@ -33,6 +33,8 @@ This tutorial demonstrates population Bayesian PBPK analyses using the open-sour
 - `script/mavoPBPKGenODE_run.jl`: runs the Julia/SciML/Turing.jl general ODE analysis using the model `model/mavoPBPKGenODE.jl`.
 - `script/mavoPBPKLinODE_run.jl`: runs the Julia/SciML/Turing.jl linear ODE analysis using the model `model/mavoPBPKLinODE.jl`. **Note: This script is still not finalized and is kept in the repository as a place holder**. 
 
+---
+
 R `sessionInfo()`
 
 ```
@@ -80,6 +82,8 @@ loaded via a namespace (and not attached):
 [77] broom_1.0.1          googledrive_2.0.0    gargle_1.2.1         globals_0.16.1      
 [81] ellipsis_0.3.2 
 ```
+
+---
 
 Julia `versioninfo()`
 
