@@ -1,27 +1,32 @@
 # BayesPBPK-tutorial
 
-This tutorial demonstrates population Bayesian PBPK analyses using the open-source tools R/Stan/Torsten and Julia/SciML/Turing.jl.
+This tutorial demonstrates population Bayesian PBPK analyses using the open-source tools R/Stan/Torsten and Julia/SciML/Turing.jl. The examples herein can be run directly from this Github repository or by using a docker image.
 
-## Cloning the repository:
+## Running the tutorial:
 
-- Click the `code` drop-down menu on the Github repository page.
+### 1. Github repository
+
+- Clone this Github repository by clicking the `code` drop-down menu on the repository page.
 - Copy the repository url.
-- Open a terminal, go to where you like the repository to be cloned and type `git clone <copied url>`
+- Open a terminal, go to where you like the repository to be cloned and type `git clone <copied url>`.
+- Set up the environment and install packages:
+    - R:
+      - Recommended IDE is Rstudio.
+      - Activate the R project environment in Rstudio by going to `File` -> `Open Project` then browse to the `BayesPBPK.Rproj` file.
+      - Activate the `renv` by running `library(renv)` and `renv::activate()`
+      - Install/restore packages from the `renv.lock` file by running `renv::restore()`
+      - This will install all packages listed in the `pkgs.R` file and will make them available for loading whenever this project environment is activated.
+      - Clone the Torsten repository and place it under the `script` directory in the tutorial repository.  
+      - Torsten requires a C++ compiler. For further details on Torsten installation and required C++ compilers check out this [installation guide](https://metrumresearchgroup.github.io/Torsten/installation/).
 
-## Setting up environments and package installation:
-- R:
-  - Recommended IDE is Rstudio.
-  - Activate the R project environment in Rstudio by going to `File` -> `Open Project` then browse to the `BayesPBPK.Rproj` file.
-  - Activate the `renv` by running `library(renv)` and `renv::activate()`
-  - Install/restore packages from the `renv.lock` file by running `renv::restore()`
-  - This will install all packages listed in the `pkgs.R` file and will make them available for loading whenever this project environment is activated.
+  - Julia:
+    - Recommended IDE is Visual Studio Code.
+    - Open a julia REPL by going to `View` -> `Command Palette` then typing `Julia: Start REPL`. 
+    - Make sure you are in the root directory (where the `Project.toml` file is located) then activate the julia project environment by typing `]` -> `activate .` -> `instantiate`. This will install all packages listed in the `Project.toml` file and make them available for loading whenever this project environment is activated.
 
-- Julia:
-  - Recommended IDE is Visual Studio Code.
-  - Open a julia REPL by going to `View` -> `Command Palette` then typing `Julia: Start REPL`. 
-  - Make sure you are in the root directory (where the `Project.toml` file is located) then activate the julia project environment by typing `]` -> `activate .` -> `instantiate`. This will install all packages listed in the `Project.toml` file and make them available for loading whenever this project environment is activated.
+### 2. Docker image
 
-Scripts to run the analyses are:
+## Scripts to run the analyses are:
 
 - `script/mavoPBPKGenODE.R`: runs the R/Stan/Torsten general ODE analysis using the model `model/mavoPBPKGenODE.stan`.
 - `script/mavoPBPKLinODE.R`: runs the R/Stan/Torsten linear ODE analysis using the model `model/mavoPBPKLinODE.stan`.
