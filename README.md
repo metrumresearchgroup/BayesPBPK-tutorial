@@ -2,7 +2,7 @@
 
 This tutorial demonstrates population Bayesian PBPK analyses using the open-source tools R/Stan/Torsten and Julia/SciML/Turing.jl. The examples herein can be run directly from this Github repository or by using a docker image.
 
-## Set up:
+## Set up
 
 ### 1. Github repository
 
