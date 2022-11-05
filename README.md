@@ -26,7 +26,7 @@ This tutorial demonstrates population Bayesian PBPK analyses using the open-sour
 
 ### 2. Docker image
 
-## Scripts to run the analyses are:
+## Scripts to run the analyses
 
 - `script/mavoPBPKGenODE.R`: runs the R/Stan/Torsten general ODE analysis using the model `model/mavoPBPKGenODE.stan`.
 - `script/mavoPBPKLinODE.R`: runs the R/Stan/Torsten linear ODE analysis using the model `model/mavoPBPKLinODE.stan`.
