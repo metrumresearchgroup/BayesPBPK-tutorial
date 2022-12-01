@@ -28,7 +28,10 @@ This tutorial demonstrates population Bayesian PBPK analyses using the open-sour
 
 - Install and start [Docker desktop](https://www.docker.com/products/docker-desktop)
 - A Dockerfile and Makefile to build the docker image have been provided. From this directory run 
-```make build-image``` to build the image using the provided Dockerfile and add it to docker (Note: This may take up to an hour.)
+```
+make build-image
+``` 
+to build the image using the provided Dockerfile and add it to docker (Note: This may take up to an hour.)
 - A docker-compose file has been provided for convenience. After building the image, launch a docker container using the image via docker-compose. From this directory run:
 ```
 docker-compose up -d
