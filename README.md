@@ -26,6 +26,22 @@ This tutorial demonstrates population Bayesian PBPK analyses using the open-sour
 
 ### 2. Docker image
 
+- Install and start [Docker desktop](https://www.docker.com/products/docker-desktop)
+- A Dockerfile and Makefile to build the docker image have been provided. From this directory run 
+```make build-image``` to build the image using the provided Dockerfile and add it to docker (Note: This may take up to an hour.)
+- A docker-compose file has been provided for convenience. After building the image, launch a docker container using the image via docker-compose. From this directory run:
+```
+docker-compose up -d
+```
+
+* This will launch the docker container, you can then access VSCode running in the docker container in a web browser by visiting:
+http://localhost:8443
+and RStudio by visiting:
+http://localhost:8787
+
+From RStudio and VSCode start the R and Julia projects as you normally would. All of the packages, binaries, and dependencies for R, Julia and STAN/Torsten should be pre-installed and the scripts should run with no additional configuration needed.
+
+
 ## Scripts to run the analyses
 
 - `script/mavoPBPKGenODE.R`: runs the R/Stan/Torsten general ODE analysis using the model `model/mavoPBPKGenODE.stan`.
